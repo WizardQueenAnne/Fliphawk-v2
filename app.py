@@ -1,6 +1,6 @@
 """
-FlipHawk Flask Application
-Main entry point for the web application
+Enhanced Flask App Integration
+Updated app.py to use the enhanced scraper with better frontend integration
 """
 
 from flask import Flask, render_template, request, jsonify, session
@@ -12,8 +12,12 @@ from datetime import datetime
 import threading
 import time
 
-# Import our custom modules
-from backend.scraper.fliphawk_scraper import EnhancedFlipHawkScraper, create_api_endpoints, validate_scan_request
+# Import our enhanced modules
+from enhanced_scraper import (
+    EnhancedFlipHawkScraper, 
+    create_enhanced_api_endpoints, 
+    validate_enhanced_scan_request
+)
 from backend.flipship.product_manager import FlipShipProductManager
 from config import Config
 
@@ -37,9 +41,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize scraper and API endpoints
-scraper = EnhancedFlipHawkScraper()
-api_endpoints = create_api_endpoints(scraper)
+# Initialize enhanced scraper and API endpoints
+enhanced_scraper = EnhancedFlipHawkScraper()
+api_endpoints = create_enhanced_api_endpoints(enhanced_scraper)
 flipship_manager = FlipShipProductManager()
 
 # Global state for background scanning
@@ -49,12 +53,69 @@ background_scan_results = None
 @app.route('/')
 def index():
     """Main landing page - redirect to FlipHawk"""
-    return render_template('fliphawk.html')
+    return render_template('500.html'), 500
+
+@app.errorhandler(429)
+def rate_limit_error(error):
+    """Handle rate limiting errors"""
+    return jsonify({
+        'status': 'error',
+        'message': 'Rate limit exceeded. Please try again later.',
+        'data': None
+    }), 429
+
+# =============================================================================
+# INITIALIZATION AND STARTUP
+# =============================================================================
+
+def initialize_enhanced_app():
+    """Initialize application with enhanced features"""
+    try:
+        # Initialize FlipShip with sample products
+        flipship_manager.initialize_sample_products()
+        logger.info("✅ FlipShip initialized with sample products")
+        
+        # Test enhanced scraper
+        logger.info("🧪 Testing enhanced scraper...")
+        test_result = enhanced_scraper.comprehensive_arbitrage_scan(
+            keywords="test product",
+            target_categories=['Tech'],
+            target_subcategories={'Tech': ['Headphones']},
+            min_profit=10.0,
+            max_results=1
+        )
+        
+        if test_result['opportunities_summary']['total_opportunities'] >= 0:
+            logger.info("✅ Enhanced scraper test successful")
+        else:
+            logger.warning("⚠️ Enhanced scraper test returned no results")
+            
+    except Exception as e:
+        logger.error(f"❌ Error during enhanced app initialization: {e}")
+
+# Initialize when app starts
+with app.app_context():
+    initialize_enhanced_app()
+
+if __name__ == '__main__':
+    logger.info("🚀 Starting Enhanced FlipHawk Server...")
+    logger.info("📡 Enhanced eBay scraper with advanced keyword generation")
+    logger.info("🎯 Intelligent profitability analysis")
+    logger.info("🔄 FlipShip integration ready")
+    logger.info("🌐 Frontend available at http://localhost:5000")
+    
+    # Development server
+    app.run(
+        host='0.0.0.0',
+        port=int(os.environ.get('PORT', 5000)),
+        debug=os.environ.get('FLASK_ENV') == 'development',
+        threaded=True  # Enable threading for background scans
+    )('fliphawk_enhanced.html')
 
 @app.route('/fliphawk')
 def fliphawk():
-    """FlipHawk arbitrage scanner interface"""
-    return render_template('fliphawk.html')
+    """Enhanced FlipHawk arbitrage scanner interface"""
+    return render_template('fliphawk_enhanced.html')
 
 @app.route('/flipship')
 def flipship():
@@ -63,7 +124,7 @@ def flipship():
     return render_template('flipship.html', products=products)
 
 # =============================================================================
-# API ROUTES
+# ENHANCED API ROUTES
 # =============================================================================
 
 @app.route('/api/categories', methods=['GET'])
@@ -82,12 +143,12 @@ def get_categories():
 
 @app.route('/api/scan', methods=['POST'])
 def scan_arbitrage():
-    """Start arbitrage scan with user parameters"""
+    """Enhanced arbitrage scan with user parameters"""
     try:
         request_data = request.get_json() or {}
         
         # Validate request data
-        validation = validate_scan_request(request_data)
+        validation = validate_enhanced_scan_request(request_data)
         if not validation['valid']:
             return jsonify({
                 'status': 'error',
@@ -95,94 +156,107 @@ def scan_arbitrage():
                 'errors': validation['errors']
             }), 400
         
-        # Start scan
-        logger.info(f"Starting scan with params: {request_data}")
+        # Log scan request
+        logger.info(f"Starting enhanced scan with params: {request_data}")
+        
+        # Start enhanced scan
         result = api_endpoints['scan_arbitrage'](request_data)
         
         # Store results in session for potential FlipShip integration
         if result['status'] == 'success':
             session['last_scan_results'] = result['data']
+            session['scan_timestamp'] = datetime.now().isoformat()
         
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Error during scan: {e}")
+        logger.error(f"Error during enhanced scan: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Scan failed due to server error',
+            'message': 'Enhanced scan failed due to server error',
             'data': None
         }), 500
 
 @app.route('/api/scan/quick', methods=['POST'])
 def quick_scan():
-    """Quick scan with predefined parameters"""
+    """Enhanced quick scan with trending keywords"""
     try:
-        quick_params = {
-            'categories': ['Tech', 'Gaming'],
+        logger.info("Starting enhanced quick scan")
+        result = api_endpoints['quick_scan']()
+        
+        # Store results in session
+        if result['status'] == 'success':
+            session['last_scan_results'] = result['data']
+            session['scan_timestamp'] = datetime.now().isoformat()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error during enhanced quick scan: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Enhanced quick scan failed',
+            'data': None
+        }), 500
+
+@app.route('/api/scan/trending', methods=['POST'])
+def trending_scan():
+    """Scan with current trending keywords"""
+    try:
+        # Get trending keywords from various sources
+        trending_keywords = get_current_trending_keywords()
+        
+        scan_params = {
+            'keywords': ', '.join(trending_keywords[:5]),
+            'categories': ['Tech', 'Gaming', 'Collectibles', 'Fashion'],
             'subcategories': {
                 'Tech': ['Headphones', 'Smartphones'],
-                'Gaming': ['Consoles', 'Video Games']
+                'Gaming': ['Consoles', 'Video Games'],
+                'Collectibles': ['Trading Cards'],
+                'Fashion': ['Sneakers']
             },
             'min_profit': 20.0,
-            'max_results': 10
+            'max_results': 20
         }
         
-        logger.info("Starting quick scan")
-        result = api_endpoints['scan_arbitrage'](quick_params)
+        logger.info(f"Starting trending scan with keywords: {trending_keywords}")
+        result = api_endpoints['scan_arbitrage'](scan_params)
+        
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Error during quick scan: {e}")
+        logger.error(f"Error during trending scan: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Quick scan failed',
+            'message': 'Trending scan failed',
             'data': None
         }), 500
 
-@app.route('/api/trending', methods=['POST'])
-def add_trending_keywords():
-    """Add trending keywords to the system"""
+@app.route('/api/scan/keyword-suggestions', methods=['GET'])
+def get_keyword_suggestions():
+    """Get keyword suggestions for user input"""
     try:
-        request_data = request.get_json() or {}
-        keywords = request_data.get('keywords', [])
+        query = request.args.get('q', '').lower()
+        category = request.args.get('category', 'all').lower()
         
-        if not keywords:
-            return jsonify({
-                'status': 'error',
-                'message': 'No keywords provided',
-                'data': None
-            }), 400
+        # Load keyword suggestions from various sources
+        suggestions = generate_keyword_suggestions(query, category)
         
-        result = api_endpoints['add_trending'](request_data)
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error adding trending keywords: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': 'Failed to add trending keywords',
-            'data': None
-        }), 500
-
-@app.route('/api/trending', methods=['GET'])
-def get_trending_keywords():
-    """Get current trending keywords"""
-    try:
-        trending = scraper.keyword_db.get_trending_keywords(20)
         return jsonify({
             'status': 'success',
             'data': {
-                'keywords': trending,
-                'count': len(trending),
-                'last_updated': datetime.now().isoformat()
+                'suggestions': suggestions[:10],  # Limit to 10 suggestions
+                'query': query,
+                'category': category
             },
-            'message': 'Trending keywords retrieved successfully'
+            'message': 'Keyword suggestions retrieved successfully'
         })
+        
     except Exception as e:
-        logger.error(f"Error getting trending keywords: {e}")
+        logger.error(f"Error getting keyword suggestions: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Failed to retrieve trending keywords',
+            'message': 'Failed to get keyword suggestions',
             'data': None
         }), 500
 
@@ -191,6 +265,18 @@ def get_session_stats():
     """Get current session statistics"""
     try:
         result = api_endpoints['get_session_stats']()
+        
+        # Add additional stats
+        if result['status'] == 'success':
+            # Get last scan info from session
+            last_scan = session.get('last_scan_results')
+            if last_scan:
+                result['data']['last_scan'] = {
+                    'timestamp': session.get('scan_timestamp'),
+                    'opportunities_found': last_scan.get('opportunities_summary', {}).get('total_opportunities', 0),
+                    'average_profit': last_scan.get('opportunities_summary', {}).get('average_profit', 0)
+                }
+        
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting session stats: {e}")
@@ -201,7 +287,7 @@ def get_session_stats():
         }), 500
 
 # =============================================================================
-# FLIPSHIP API ROUTES
+# ENHANCED FLIPSHIP API ROUTES
 # =============================================================================
 
 @app.route('/api/flipship/products', methods=['GET'])
@@ -237,123 +323,221 @@ def create_flipship_product():
     """Create new FlipShip product from scan results"""
     try:
         request_data = request.get_json() or {}
-        opportunity_data = request_data.get('opportunity')
+        opportunity_id = request_data.get('opportunity_id')
+        
+        if not opportunity_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Opportunity ID required',
+                'data': None
+            }), 400
+        
+        # Get the opportunity from last scan results
+        last_scan = session.get('last_scan_results')
+        if not last_scan:
+            return jsonify({
+                'status': 'error',
+                'message': 'No recent scan results found',
+                'data': None
+            }), 400
+        
+        # Find the specific opportunity
+        opportunity_data = None
+        for opp in last_scan.get('top_opportunities', []):
+            if opp.get('item_id') == opportunity_id:
+                opportunity_data = opp
+                break
         
         if not opportunity_data:
             return jsonify({
                 'status': 'error',
-                'message': 'No opportunity data provided',
+                'message': 'Opportunity not found in recent results',
                 'data': None
             }), 400
         
+        # Create FlipShip product
         product = flipship_manager.create_product_from_opportunity(opportunity_data)
         
         return jsonify({
             'status': 'success',
-            'data': product,
-            'message': 'Product created successfully'
+            'data': product.__dict__ if hasattr(product, '__dict__') else product,
+            'message': 'Product created successfully for FlipShip'
         })
         
     except Exception as e:
         logger.error(f"Error creating FlipShip product: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Failed to create product',
+            'message': f'Failed to create product: {str(e)}',
             'data': None
         }), 500
 
-@app.route('/api/flipship/cart', methods=['POST'])
-def add_to_cart():
-    """Add product to shopping cart"""
+@app.route('/api/flipship/bulk-create', methods=['POST'])
+def bulk_create_flipship_products():
+    """Create multiple FlipShip products from scan results"""
     try:
         request_data = request.get_json() or {}
-        product_id = request_data.get('product_id')
-        quantity = int(request_data.get('quantity', 1))
+        opportunity_ids = request_data.get('opportunity_ids', [])
         
-        if not product_id:
+        if not opportunity_ids:
             return jsonify({
                 'status': 'error',
-                'message': 'Product ID required',
+                'message': 'At least one opportunity ID required',
                 'data': None
             }), 400
         
-        # Initialize cart in session if not exists
-        if 'cart' not in session:
-            session['cart'] = []
+        # Get last scan results
+        last_scan = session.get('last_scan_results')
+        if not last_scan:
+            return jsonify({
+                'status': 'error',
+                'message': 'No recent scan results found',
+                'data': None
+            }), 400
         
-        # Add to cart
-        cart_item = {
-            'product_id': product_id,
-            'quantity': quantity,
-            'added_at': datetime.now().isoformat()
-        }
+        created_products = []
+        failed_products = []
         
-        session['cart'].append(cart_item)
-        session.modified = True
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'cart_items': len(session['cart']),
-                'item_added': cart_item
-            },
-            'message': 'Product added to cart'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error adding to cart: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': 'Failed to add to cart',
-            'data': None
-        }), 500
-
-@app.route('/api/flipship/cart', methods=['GET'])
-def get_cart():
-    """Get current shopping cart contents"""
-    try:
-        cart = session.get('cart', [])
-        
-        # Get product details for cart items
-        cart_details = []
-        for item in cart:
-            product = flipship_manager.get_product_by_id(item['product_id'])
-            if product:
-                cart_details.append({
-                    **item,
-                    'product': product
+        for opp_id in opportunity_ids:
+            try:
+                # Find opportunity
+                opportunity_data = None
+                for opp in last_scan.get('top_opportunities', []):
+                    if opp.get('item_id') == opp_id:
+                        opportunity_data = opp
+                        break
+                
+                if opportunity_data:
+                    product = flipship_manager.create_product_from_opportunity(opportunity_data)
+                    created_products.append({
+                        'opportunity_id': opp_id,
+                        'product_id': product.product_id,
+                        'title': product.title
+                    })
+                else:
+                    failed_products.append({
+                        'opportunity_id': opp_id,
+                        'error': 'Opportunity not found'
+                    })
+                    
+            except Exception as e:
+                failed_products.append({
+                    'opportunity_id': opp_id,
+                    'error': str(e)
                 })
         
-        total_value = sum(
-            item['product']['price'] * item['quantity'] 
-            for item in cart_details
-        )
-        
         return jsonify({
             'status': 'success',
             'data': {
-                'items': cart_details,
-                'total_items': len(cart_details),
-                'total_value': total_value
+                'created_products': created_products,
+                'failed_products': failed_products,
+                'total_created': len(created_products),
+                'total_failed': len(failed_products)
             },
-            'message': 'Cart retrieved successfully'
+            'message': f'Bulk creation completed: {len(created_products)} created, {len(failed_products)} failed'
         })
         
     except Exception as e:
-        logger.error(f"Error getting cart: {e}")
+        logger.error(f"Error in bulk creation: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Failed to retrieve cart',
+            'message': f'Bulk creation failed: {str(e)}',
             'data': None
         }), 500
 
 # =============================================================================
-# BACKGROUND SCANNING (Optional Feature)
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def get_current_trending_keywords():
+    """Get current trending keywords from various sources"""
+    # This could be enhanced to pull from actual trending APIs
+    base_trending = [
+        "viral tiktok", "trending 2025", "popular now", "hot deals",
+        "limited edition", "exclusive drop", "sold out everywhere",
+        "rare find", "collector item", "investment piece",
+        "airpods pro 2", "nintendo switch oled", "pokemon cards",
+        "supreme hoodie", "jordan 1", "iphone 15 pro", "ps5",
+        "tesla accessories", "crypto merch", "nft collectibles"
+    ]
+    
+    # Add seasonal/time-based keywords
+    current_month = datetime.now().month
+    seasonal_keywords = {
+        1: ["new year", "resolution", "fitness"],
+        2: ["valentine", "love", "gifts"],
+        3: ["spring", "easter", "renewal"],
+        4: ["april", "spring cleaning", "fresh"],
+        5: ["mother's day", "graduation", "spring"],
+        6: ["summer", "vacation", "outdoor"],
+        7: ["summer", "july 4th", "patriotic"],
+        8: ["back to school", "college", "supplies"],
+        9: ["fall", "autumn", "cozy"],
+        10: ["halloween", "spooky", "costume"],
+        11: ["thanksgiving", "black friday", "deals"],
+        12: ["christmas", "holiday", "gifts"]
+    }
+    
+    seasonal = seasonal_keywords.get(current_month, [])
+    
+    return base_trending + seasonal
+
+def generate_keyword_suggestions(query, category):
+    """Generate keyword suggestions based on user input"""
+    keyword_database = {
+        'tech': [
+            'airpods', 'iphone', 'samsung galaxy', 'macbook', 'ipad',
+            'gaming laptop', 'mechanical keyboard', 'wireless mouse',
+            'bluetooth speaker', 'smartwatch', 'camera', 'headphones'
+        ],
+        'gaming': [
+            'ps5', 'xbox series x', 'nintendo switch', 'gaming chair',
+            'gaming headset', 'controller', 'gaming monitor', 'pc parts',
+            'call of duty', 'pokemon', 'zelda', 'mario', 'fifa'
+        ],
+        'collectibles': [
+            'pokemon cards', 'magic cards', 'baseball cards', 'funko pop',
+            'action figures', 'vintage toys', 'comic books', 'trading cards',
+            'graded cards', 'psa 10', 'first edition', 'rare cards'
+        ],
+        'fashion': [
+            'jordan', 'yeezy', 'supreme', 'nike', 'adidas', 'designer',
+            'sneakers', 'streetwear', 'vintage', 'luxury', 'limited edition',
+            'off white', 'balenciaga', 'gucci', 'louis vuitton'
+        ],
+        'all': []
+    }
+    
+    # Get category keywords
+    category_keywords = keyword_database.get(category, keyword_database['all'])
+    
+    # If no category specified, use all keywords
+    if category == 'all' or not category_keywords:
+        all_keywords = []
+        for cat_kw in keyword_database.values():
+            all_keywords.extend(cat_kw)
+        category_keywords = all_keywords
+    
+    # Filter keywords based on query
+    if query:
+        suggestions = [kw for kw in category_keywords if query in kw.lower()]
+        # Add query variations
+        suggestions.extend([
+            f"{query} new", f"{query} used", f"{query} vintage",
+            f"{query} rare", f"{query} limited", f"authentic {query}"
+        ])
+    else:
+        suggestions = category_keywords[:10]
+    
+    return list(set(suggestions))  # Remove duplicates
+
+# =============================================================================
+# BACKGROUND SCANNING (Enhanced)
 # =============================================================================
 
 @app.route('/api/scan/background/start', methods=['POST'])
 def start_background_scan():
-    """Start continuous background scanning"""
+    """Start enhanced continuous background scanning"""
     global background_scan_active
     
     if background_scan_active:
@@ -363,39 +547,71 @@ def start_background_scan():
             'data': {'active': True}
         })
     
-    def background_scan_worker():
+    def enhanced_background_scan_worker():
         global background_scan_active, background_scan_results
         background_scan_active = True
         
+        scan_count = 0
         while background_scan_active:
             try:
-                scan_params = {
-                    'categories': ['Tech', 'Gaming', 'Collectibles'],
-                    'min_profit': 25.0,
-                    'max_results': 15
+                # Rotate through different scan types
+                if scan_count % 3 == 0:
+                    # Trending scan
+                    trending_keywords = get_current_trending_keywords()
+                    scan_params = {
+                        'keywords': ', '.join(trending_keywords[:3]),
+                        'categories': ['Tech', 'Gaming'],
+                        'min_profit': 30.0,
+                        'max_results': 10
+                    }
+                elif scan_count % 3 == 1:
+                    # Tech focus scan
+                    scan_params = {
+                        'keywords': 'airpods, iphone, macbook, gaming laptop',
+                        'categories': ['Tech'],
+                        'subcategories': {'Tech': ['Headphones', 'Smartphones', 'Laptops']},
+                        'min_profit': 25.0,
+                        'max_results': 10
+                    }
+                else:
+                    # Collectibles focus scan
+                    scan_params = {
+                        'keywords': 'pokemon cards, magic cards, funko pop',
+                        'categories': ['Collectibles'],
+                        'subcategories': {'Collectibles': ['Trading Cards', 'Action Figures']},
+                        'min_profit': 35.0,
+                        'max_results': 10
+                    }
+                
+                logger.info(f"Running background scan #{scan_count + 1}...")
+                result = api_endpoints['scan_arbitrage'](scan_params)
+                background_scan_results = {
+                    'scan_number': scan_count + 1,
+                    'timestamp': datetime.now().isoformat(),
+                    'result': result
                 }
                 
-                logger.info("Running background scan...")
-                result = api_endpoints['scan_arbitrage'](scan_params)
-                background_scan_results = result
+                scan_count += 1
                 
-                # Wait 5 minutes before next scan
-                for _ in range(300):  # 300 seconds = 5 minutes
+                # Wait 10 minutes before next scan
+                for _ in range(600):  # 600 seconds = 10 minutes
                     if not background_scan_active:
                         break
                     time.sleep(1)
                     
             except Exception as e:
                 logger.error(f"Background scan error: {e}")
-                time.sleep(60)  # Wait 1 minute on error
+                time.sleep(120)  # Wait 2 minutes on error
+        
+        logger.info("Background scanning stopped")
     
     # Start background thread
-    thread = threading.Thread(target=background_scan_worker, daemon=True)
+    thread = threading.Thread(target=enhanced_background_scan_worker, daemon=True)
     thread.start()
     
     return jsonify({
         'status': 'success',
-        'message': 'Background scan started',
+        'message': 'Enhanced background scan started',
         'data': {'active': True}
     })
 
@@ -448,50 +664,4 @@ def internal_error(error):
             'message': 'Internal server error',
             'data': None
         }), 500
-    return render_template('500.html'), 500
-
-@app.errorhandler(429)
-def rate_limit_error(error):
-    """Handle rate limiting errors"""
-    return jsonify({
-        'status': 'error',
-        'message': 'Rate limit exceeded. Please try again later.',
-        'data': None
-    }), 429
-
-# =============================================================================
-# INITIALIZATION
-# =============================================================================
-
-def initialize_app():
-    """Initialize application with default data"""
-    try:
-        # Add some default trending keywords
-        default_trending = [
-            "airpods pro 2", "nintendo switch oled", "pokemon cards",
-            "iphone 15 pro", "ps5 console", "nike dunk low",
-            "supreme hoodie", "rolex watch", "gibson les paul",
-            "vintage t-shirt", "jordan 1 chicago", "macbook pro m3"
-        ]
-        
-        scraper.keyword_db.add_trending_keywords(default_trending, priority=1)
-        logger.info("✅ App initialized with default trending keywords")
-        
-        # Initialize FlipShip with sample products
-        flipship_manager.initialize_sample_products()
-        logger.info("✅ FlipShip initialized with sample products")
-        
-    except Exception as e:
-        logger.error(f"❌ Error during app initialization: {e}")
-
-# Initialize when app starts
-with app.app_context():
-    initialize_app()
-
-if __name__ == '__main__':
-    # Development server
-    app.run(
-        host='0.0.0.0',
-        port=int(os.environ.get('PORT', 5000)),
-        debug=os.environ.get('FLASK_ENV') == 'development'
-    )
+    return render_template
