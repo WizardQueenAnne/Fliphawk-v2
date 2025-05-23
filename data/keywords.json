@@ -101,4 +101,191 @@
       "fifa 24", "madden 24", "nba 2k24", "grand theft auto", "gta",
       "elder scrolls", "skyrim", "fallout", "witcher 3", "cyberpunk 2077",
       "spider-man", "god of war", "last of us", "uncharted", "horizon",
-      "zelda", "
+      "zelda", "breath of the wild", "tears of kingdom", "mario", "pokemon",
+      "final fantasy", "street fighter", "mortal kombat", "tekken",
+      "ps5 games", "xbox games", "nintendo switch games", "pc games", "steam games",
+      "sealed games", "new games", "used games", "collectors edition", "limited edition",
+      "battlefield", "apex legends", "fortnite", "minecraft", "roblox",
+      "assassins creed", "red dead redemption", "overwatch", "destiny"
+    ],
+    "Gaming Accessories": [
+      "gaming chair", "gaming desk", "gaming monitor", "mechanical keyboard",
+      "gaming mouse", "mouse pad", "gaming headset", "controller", "joystick",
+      "racing wheel", "flight stick", "vr headset", "capture card",
+      "gaming microphone", "webcam", "led strips", "rgb lighting"
+    ]
+  },
+  "Collectibles": {
+    "Trading Cards": [
+      "pokemon cards", "pokemon tcg", "pokemon booster", "pokemon packs",
+      "charizard", "pikachu", "blastoise", "venusaur", "mewtwo", "mew",
+      "base set", "shadowless", "first edition", "1st edition", "japanese pokemon",
+      "psa 10", "psa 9", "bgs 10", "cgc 10", "graded pokemon", "gem mint",
+      "pokemon booster box", "pokemon etb", "elite trainer box",
+      "scarlet violet", "paldea evolved", "obsidian flames", "151",
+      "brilliant stars", "evolving skies", "chilling reign", "shining fates",
+      "pokémon", "pokemom", "pokmon", "pocket monsters", "charizrd", "pickachu",
+      "magic the gathering", "mtg", "mtg cards", "magic cards", "mtg booster",
+      "black lotus", "mox", "dual lands", "fetch lands", "planeswalker",
+      "alpha mtg", "beta mtg", "power nine", "reserve list", "vintage mtg",
+      "modern horizons", "dominaria", "innistrad", "ravnica", "zendikar",
+      "magik cards", "mgic the gathering", "magic gathering",
+      "basketball cards", "nba cards", "football cards", "nfl cards", "baseball cards",
+      "topps", "panini", "upper deck", "prizm", "select", "rookie cards",
+      "michael jordan", "lebron james", "tom brady", "patrick mahomes",
+      "autograph cards", "jersey cards", "graded cards", "psa graded"
+    ],
+    "Action Figures": [
+      "hot toys", "sideshow", "neca", "mcfarlane", "funko pop", "marvel legends",
+      "star wars black series", "transformers", "gi joe", "power rangers",
+      "batman figure", "superman figure", "spider-man figure", "iron man figure",
+      "vintage figures", "loose figures", "mint on card", "moc", "mint in box",
+      "anime figures", "dragon ball figures", "naruto figures", "one piece figures"
+    ],
+    "Coins": [
+      "morgan dollar", "peace dollar", "buffalo nickel", "mercury dime",
+      "kennedy half dollar", "walking liberty", "indian head penny", "wheat penny",
+      "gold coin", "silver coin", "copper coin", "proof coin", "uncirculated coin",
+      "ngc graded", "pcgs graded", "error coin", "key date", "double die",
+      "coin collection", "foreign coins", "ancient coins", "commemorative coin"
+    ]
+  },
+  "Fashion": {
+    "Sneakers": [
+      "air jordan", "jordan 1", "jordan 4", "jordan 11", "jordan 3", "jordan 6",
+      "chicago 1", "bred 4", "concord 11", "black cement 3", "infrared 6",
+      "travis scott jordan", "off white jordan", "fragment jordan", "dior jordan",
+      "retro jordan", "og jordan", "high jordan", "low jordan", "mid jordan",
+      "size 8", "size 9", "size 10", "size 11", "size 12", "gs", "youth", "womens",
+      "deadstock", "ds", "vnds", "used", "beater", "og all", "replacement box",
+      "nike dunk", "dunk low", "dunk high", "sb dunk", "panda dunk", "michigan dunk",
+      "air force 1", "af1", "air max", "air max 90", "air max 97", "air max 270",
+      "blazer", "cortez", "react", "zoom", "pegasus", "vapormax", "presto",
+      "yeezy", "yeezy 350", "yeezy 700", "yeezy boost", "ultraboost", "nmd",
+      "stan smith", "gazelle", "campus", "samba", "forum", "superstar",
+      "new balance", "nb", "990", "991", "992", "993", "550", "2002r",
+      "converse", "chuck taylor", "all star", "vans", "old skool", "authentic"
+    ],
+    "Designer Clothing": [
+      "supreme", "off white", "fear of god", "essentials", "fog", "vetements",
+      "balenciaga", "stone island", "palace", "kith", "bape", "human made",
+      "golf wang", "chrome hearts", "gallery dept", "rhude", "amiri",
+      "palm angels", "mastermind", "neighborhood", "gucci", "louis vuitton",
+      "hoodie", "crewneck", "t-shirt", "sweatshirt", "jacket", "pants", "shorts"
+    ],
+    "Vintage Clothing": [
+      "vintage band tee", "vintage rap tee", "vintage movie tee", "vintage sports tee",
+      "vintage nike", "vintage adidas", "vintage champion", "vintage tommy hilfiger",
+      "vintage carhartt", "90s vintage", "80s vintage", "70s vintage", "y2k vintage",
+      "grunge tee", "skate tee", "surf tee", "rave tee", "distressed vintage",
+      "nirvana tee", "metallica tee", "tupac tee", "biggie tee", "rolling stones tee"
+    ]
+  },
+  "Vintage": {
+    "Electronics": [
+      "vintage mac", "apple ii", "macintosh", "imac g3", "powerbook", "newton",
+      "vintage iphone", "original iphone", "iphone 3g", "iphone 4",
+      "vintage ipod", "ipod classic", "ipod mini", "ipod nano", "ipod shuffle",
+      "nintendo 64", "n64", "super nintendo", "snes", "nes", "gameboy",
+      "sega genesis", "dreamcast", "saturn", "neo geo", "atari 2600",
+      "vintage sony", "walkman", "discman", "boombox", "turntable", "technics 1200"
+    ],
+    "Cameras": [
+      "leica camera", "hasselblad camera", "rolleiflex camera", "nikon camera",
+      "canon camera", "minolta camera", "olympus camera", "pentax camera",
+      "polaroid camera", "polaroid 600", "polaroid sx-70", "instant camera",
+      "film camera", "35mm camera", "medium format camera", "vintage camera"
+    ]
+  },
+  "Music": {
+    "Instruments": [
+      "guitar", "electric guitar", "acoustic guitar", "bass guitar", "fender guitar",
+      "gibson guitar", "stratocaster", "telecaster", "les paul", "sg guitar",
+      "piano", "keyboard", "synthesizer", "drums", "drum kit", "violin",
+      "trumpet", "saxophone", "clarinet", "flute", "ukulele", "mandolin"
+    ],
+    "Audio Equipment": [
+      "amplifier", "guitar amp", "speaker", "microphone", "audio interface",
+      "mixing board", "dj controller", "turntable", "record player", "vinyl",
+      "headphones", "studio monitors", "subwoofer", "pa system"
+    ],
+    "Vinyl Records": [
+      "vinyl record", "lp record", "45 rpm", "33 rpm", "picture disc", "colored vinyl",
+      "sealed vinyl", "first pressing", "original pressing", "rare vinyl",
+      "jazz vinyl", "rock vinyl", "blues vinyl", "soul vinyl", "hip hop vinyl",
+      "beatles vinyl", "pink floyd vinyl", "led zeppelin vinyl", "elvis vinyl"
+    ]
+  },
+  "Antiques": {
+    "Furniture": [
+      "antique furniture", "vintage furniture", "mid century modern", "art deco",
+      "victorian furniture", "colonial furniture", "antique chair", "antique table",
+      "antique desk", "antique cabinet", "antique dresser", "antique mirror"
+    ],
+    "Collectibles": [
+      "antique clock", "vintage clock", "pocket watch", "antique jewelry",
+      "vintage jewelry", "antique china", "vintage pottery", "antique glass",
+      "vintage toys", "antique books", "vintage magazines", "antique postcards"
+    ]
+  },
+  "Books": {
+    "Fiction": [
+      "harry potter", "stephen king", "james patterson", "john grisham",
+      "dan brown", "nicholas sparks", "dean koontz", "agatha christie",
+      "first edition", "signed book", "rare book", "vintage book"
+    ],
+    "Non-Fiction": [
+      "biography", "autobiography", "history book", "science book", "cookbook",
+      "self help", "business book", "psychology book", "philosophy book"
+    ],
+    "Comics": [
+      "comic book", "marvel comics", "dc comics", "batman comic", "superman comic",
+      "spider-man comic", "x-men comic", "first appearance", "key issue",
+      "cgc graded comic", "vintage comic", "golden age comic", "silver age comic"
+    ]
+  },
+  "Sports": {
+    "Equipment": [
+      "golf clubs", "tennis racket", "baseball bat", "football helmet",
+      "basketball shoes", "running shoes", "workout equipment", "weights",
+      "treadmill", "exercise bike", "yoga mat", "dumbbells"
+    ],
+    "Memorabilia": [
+      "sports memorabilia", "autographed jersey", "signed baseball", "signed football",
+      "sports cards", "game used", "stadium seat", "championship ring"
+    ]
+  },
+  "Home": {
+    "Appliances": [
+      "kitchen appliances", "coffee maker", "blender", "toaster", "microwave",
+      "refrigerator", "dishwasher", "washing machine", "dryer", "vacuum cleaner",
+      "air fryer", "instant pot", "food processor", "stand mixer"
+    ],
+    "Decor": [
+      "wall art", "canvas print", "picture frame", "mirror", "lamp", "chandelier",
+      "throw pillow", "blanket", "rug", "curtains", "plant pot", "vase"
+    ]
+  },
+  "Tools": {
+    "Power Tools": [
+      "drill", "circular saw", "impact driver", "angle grinder", "reciprocating saw",
+      "jigsaw", "router", "sander", "nail gun", "air compressor", "welding machine",
+      "dewalt", "milwaukee", "makita", "bosch", "ryobi", "craftsman"
+    ],
+    "Hand Tools": [
+      "wrench set", "socket set", "screwdriver set", "pliers", "hammer",
+      "level", "tape measure", "utility knife", "chisel", "saw", "file"
+    ]
+  },
+  "Automotive": {
+    "Parts": [
+      "car parts", "auto parts", "engine parts", "brake pads", "oil filter",
+      "air filter", "spark plugs", "battery", "alternator", "starter",
+      "headlights", "taillights", "bumper", "fender", "hood", "door"
+    ],
+    "Accessories": [
+      "car accessories", "floor mats", "seat covers", "steering wheel cover",
+      "phone mount", "dash cam", "backup camera", "car charger", "air freshener"
+    ]
+  }
+}
