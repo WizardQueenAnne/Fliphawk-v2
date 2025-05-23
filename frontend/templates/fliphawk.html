@@ -1,0 +1,1216 @@
+              <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlipHawk - AI-Powered Arbitrage Scanner</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --surface: rgba(255, 255, 255, 0.05);
+            --surface-hover: rgba(255, 255, 255, 0.1);
+            --border: rgba(255, 255, 255, 0.1);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --glow: 0 0 50px rgba(102, 126, 234, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 75% 75%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Header */
+        .header {
+            position: relative;
+            padding: 2rem 0;
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 50px rgba(102, 126, 234, 0.5);
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Main Content Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            height: fit-content;
+            position: sticky;
+            top: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .control-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Form Groups */
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Category Pills */
+        .category-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .category-pill {
+            padding: 0.75rem 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .category-pill:hover {
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+        }
+
+        .category-pill.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Range Slider */
+        .range-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .range-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .range-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .range-slider {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .range-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-scan {
+            width: 100%;
+            margin-top: 1rem;
+            font-size: 1.1rem;
+            padding: 1.25rem 2rem;
+            position: relative;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Results Section */
+        .results-section {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            min-height: 600px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .results-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .results-stats {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Product Cards */
+        .product-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .product-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .product-header {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .product-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: var(--bg-tertiary);
+        }
+
+        .product-info {
+            flex: 1;
+        }
+
+        .product-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+
+        .product-condition {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--success);
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .product-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .profit-positive { color: var(--success); }
+        .profit-negative { color: var(--danger); }
+
+        .confidence-score {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(135deg, var(--success), var(--warning));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .product-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .empty-text {
+            margin-bottom: 2rem;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            
+            .control-panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .logo {
+                font-size: 2.5rem;
+            }
+            
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+            
+            .product-metrics {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .product-actions {
+                flex-direction: column;
+            }
+        }
+
+        /* Utility Classes */
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            max-width: 400px;
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            color: white;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .notification-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+        }
+
+        .notification-error {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+        }
+
+        .notification-info {
+            background: linear-gradient(135deg, var(--accent), #0891b2);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="logo">🦅 FlipHawk</h1>
+            <p class="tagline">AI-Powered Arbitrage Scanner • Find Hidden Profits on eBay</p>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="totalScans">0</div>
+                <div class="stat-label">Total Scans</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="profitableItems">0</div>
+                <div class="stat-label">Profitable Items</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgProfit">$0</div>
+                <div class="stat-label">Avg Profit</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="successRate">0%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <h2 class="panel-title">🎯 Scan Configuration</h2>
+                
+                <form id="scanForm">
+                    <div class="form-group">
+                        <label class="form-label">🔍 Search Keywords</label>
+                        <input type="text" class="form-input" id="keywords" placeholder="e.g., airpods pro, pokemon cards, nintendo switch" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">📂 Categories</label>
+                        <div class="category-pills">
+                            <div class="category-pill active" data-category="Tech">💻 Tech</div>
+                            <div class="category-pill" data-category="Gaming">🎮 Gaming</div>
+                            <div class="category-pill" data-category="Collectibles">🃏 Cards</div>
+                            <div class="category-pill" data-category="Fashion">👟 Fashion</div>
+                            <div class="category-pill" data-category="Vintage">📻 Vintage</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">🎯 Subcategory</label>
+                        <select class="form-select" id="subcategory">
+                            <option value="Headphones">🎧 Headphones</option>
+                            <option value="Smartphones">📱 Smartphones</option>
+                            <option value="Laptops">💻 Laptops</option>
+                            <option value="Graphics Cards">🎮 Graphics Cards</option>
+                            <option value="Tablets">📱 Tablets</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="range-group">
+                            <div class="range-label">
+                                <span class="form-label">💰 Min Profit</span>
+                                <span class="range-value" id="minProfitValue">$15</span>
+                            </div>
+                            <input type="range" class="range-slider" id="minProfit" min="5" max="200" value="15" step="5">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="range-group">
+                            <div class="range-label">
+                                <span class="form-label">📊 Max Results</span>
+                                <span class="range-value" id="maxResultsValue">10</span>
+                            </div>
+                            <input type="range" class="range-slider" id="maxResults" min="5" max="50" value="10" step="5">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-scan" id="scanBtn">
+                        <span id="scanText">🚀 Start Scan</span>
+                        <div id="scanSpinner" class="spinner" style="display: none;"></div>
+                    </button>
+                </form>
+
+                <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="runQuickScan()">
+                        ⚡ Quick Scan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section">
+                <div class="results-header">
+                    <h2 class="results-title">📈 Arbitrage Opportunities</h2>
+                    <div class="results-stats" id="resultsStats">
+                        <span>Ready to scan</span>
+                    </div>
+                </div>
+
+                <div id="resultsContainer">
+                    <div class="empty-state">
+                        <div class="empty-icon">🎯</div>
+                        <h3 class="empty-title">Ready to Find Profits</h3>
+                        <p class="empty-text">Configure your search parameters and click "Start Scan" to discover profitable arbitrage opportunities on eBay.</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('scanForm').requestSubmit();">
+                            🚀 Start Your First Scan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let selectedCategories = ['Tech'];
+        let isScanning = false;
+        let totalScans = 0;
+        let totalProfitableItems = 0;
+        let totalProfit = 0;
+
+        // Subcategory mapping
+        const subcategories = {
+            Tech: ['Headphones', 'Smartphones', 'Laptops', 'Graphics Cards', 'Tablets'],
+            Gaming: ['Consoles', 'Video Games', 'Gaming Accessories'],
+            Collectibles: ['Trading Cards', 'Action Figures', 'Coins'],
+            Fashion: ['Sneakers', 'Designer Clothing', 'Vintage Clothing'],
+            Vintage: ['Electronics', 'Cameras']
+        };
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            updateSubcategories();
+            loadStoredStats();
+        });
+
+        function setupEventListeners() {
+            // Category pills
+            document.querySelectorAll('.category-pill').forEach(pill => {
+                pill.addEventListener('click', function() {
+                    document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedCategories = [this.dataset.category];
+                    updateSubcategories();
+                });
+            });
+
+            // Range sliders
+            const minProfitSlider = document.getElementById('minProfit');
+            const maxResultsSlider = document.getElementById('maxResults');
+            
+            minProfitSlider.addEventListener('input', function() {
+                document.getElementById('minProfitValue').textContent = `$${this.value}`;
+            });
+            
+            maxResultsSlider.addEventListener('input', function() {
+                document.getElementById('maxResultsValue').textContent = this.value;
+            });
+
+            // Form submission
+            document.getElementById('scanForm').addEventListener('submit', handleScan);
+        }
+
+        function updateSubcategories() {
+            const subcategorySelect = document.getElementById('subcategory');
+            const category = selectedCategories[0];
+            
+            subcategorySelect.innerHTML = '';
+            
+            if (subcategories[category]) {
+                subcategories[category].forEach(sub => {
+                    const option = document.createElement('option');
+                    option.value = sub;
+                    option.textContent = `${getSubcategoryIcon(sub)} ${sub}`;
+                    subcategorySelect.appendChild(option);
+                });
+            }
+        }
+
+        function getSubcategoryIcon(subcategory) {
+            const icons = {
+                'Headphones': '🎧',
+                'Smartphones': '📱',
+                'Laptops': '💻',
+                'Graphics Cards': '🎮',
+                'Tablets': '📱',
+                'Consoles': '🎮',
+                'Video Games': '🕹️',
+                'Gaming Accessories': '🎮',
+                'Trading Cards': '🃏',
+                'Action Figures': '🦸',
+                'Coins': '🪙',
+                'Sneakers': '👟',
+                'Designer Clothing': '👕',
+                'Vintage Clothing': '👗',
+                'Electronics': '📻',
+                'Cameras': '📷'
+            };
+            return icons[subcategory] || '📦';
+        }
+
+        async function handleScan(event) {
+            event.preventDefault();
+            
+            if (isScanning) return;
+            
+            const formData = {
+                keywords: document.getElementById('keywords').value.trim(),
+                categories: selectedCategories,
+                subcategories: {
+                    [selectedCategories[0]]: [document.getElementById('subcategory').value]
+                },
+                min_profit: parseFloat(document.getElementById('minProfit').value),
+                max_results: parseInt(document.getElementById('maxResults').value)
+            };
+
+            if (!formData.keywords) {
+                showNotification('Please enter search keywords', 'error');
+                return;
+            }
+
+            await startScan(formData);
+        }
+
+        async function runQuickScan() {
+            const quickScanData = {
+                keywords: 'trending viral products',
+                categories: ['Tech', 'Gaming'],
+                subcategories: {
+                    'Tech': ['Headphones', 'Smartphones'],
+                    'Gaming': ['Consoles', 'Video Games']
+                },
+                min_profit: 20.0,
+                max_results: 10
+            };
+
+            await startScan(quickScanData);
+        }
+
+        async function startScan(scanData) {
+            isScanning = true;
+            updateScanButton(true);
+            showNotification('Starting arbitrage scan...', 'info');
+
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(scanData)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    displayResults(result.data);
+                    updateStats(result.data);
+                    showNotification(`Found ${result.data.opportunities_summary.total_opportunities} profitable opportunities!`, 'success');
+                } else {
+                    throw new Error(result.message || 'Scan failed');
+                }
+            } catch (error) {
+                console.error('Scan error:', error);
+                showNotification(`Scan failed: ${error.message}`, 'error');
+                displayError();
+            } finally {
+                isScanning = false;
+                updateScanButton(false);
+            }
+        }
+
+        function updateScanButton(scanning) {
+            const btn = document.getElementById('scanBtn');
+            const text = document.getElementById('scanText');
+            const spinner = document.getElementById('scanSpinner');
+            
+            if (scanning) {
+                text.style.display = 'none';
+                spinner.style.display = 'block';
+                btn.disabled = true;
+                btn.style.opacity = '0.8';
+            } else {
+                text.style.display = 'block';
+                spinner.style.display = 'none';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+        function displayResults(data) {
+            const container = document.getElementById('resultsContainer');
+            const stats = document.getElementById('resultsStats');
+            
+            // Update stats
+            stats.innerHTML = `
+                <span>⏱️ ${data.scan_metadata.duration_seconds}s</span>
+                <span>🔍 ${data.scan_metadata.total_searches_performed} searches</span>
+                <span>📊 ${data.scan_metadata.scan_efficiency}% success rate</span>
+            `;
+
+            // Display opportunities
+            if (data.top_opportunities && data.top_opportunities.length > 0) {
+                container.innerHTML = `
+                    <div class="product-grid">
+                        ${data.top_opportunities.map(opportunity => createProductCard(opportunity)).join('')}
+                    </div>
+                `;
+                
+                // Add fade-in animation
+                container.classList.add('fade-in');
+            } else {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">😔</div>
+                        <h3 class="empty-title">No Opportunities Found</h3>
+                        <p class="empty-text">Try adjusting your search criteria or lowering the minimum profit threshold.</p>
+                        <button class="btn btn-secondary" onclick="document.getElementById('minProfit').value=5; document.getElementById('minProfitValue').textContent='$5';">
+                            📉 Lower Min Profit
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function createProductCard(opportunity) {
+            const profitClass = opportunity.estimated_profit > 0 ? 'profit-positive' : 'profit-negative';
+            const conditionClass = getConditionClass(opportunity.condition);
+            const confidenceWidth = Math.max(opportunity.confidence_score, 10);
+            
+            return `
+                <div class="product-card slide-in">
+                    <div class="product-header">
+                        <img src="${opportunity.image_url || 'https://via.placeholder.com/80x80/334155/cbd5e1?text=No+Image'}" 
+                             alt="Product" class="product-image" onerror="this.src='https://via.placeholder.com/80x80/334155/cbd5e1?text=No+Image'">
+                        <div class="product-info">
+                            <h3 class="product-title">${truncateTitle(opportunity.title)}</h3>
+                            <span class="product-condition ${conditionClass}">${opportunity.condition}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="product-metrics">
+                        <div class="metric">
+                            <div class="metric-value">${opportunity.price.toFixed(2)}</div>
+                            <div class="metric-label">eBay Price</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value ${profitClass}">${opportunity.estimated_profit.toFixed(2)}</div>
+                            <div class="metric-label">Est. Profit</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${opportunity.estimated_resale_price.toFixed(2)}</div>
+                            <div class="metric-label">Resale Price</div>
+                        </div>
+                    </div>
+                    
+                    <div class="confidence-score">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Confidence</span>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidenceWidth}%"></div>
+                        </div>
+                        <span style="font-weight: 600; color: var(--primary);">${opportunity.confidence_score}%</span>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-secondary);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>Seller Rating:</span>
+                            <span style="color: var(--success);">${opportunity.seller_rating}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>Shipping:</span>
+                            <span>${opportunity.shipping_cost.toFixed(2)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Total Cost:</span>
+                            <span style="font-weight: 600;">${opportunity.total_cost.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="product-actions">
+                        <a href="${opportunity.ebay_link}" target="_blank" class="btn btn-primary" style="flex: 1;">
+                            🛒 View on eBay
+                        </a>
+                        <button class="btn btn-secondary" onclick="flipToStore('${opportunity.item_id}')" style="flex: 1;">
+                            🚀 Flip to Store
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function truncateTitle(title, maxLength = 60) {
+            return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
+        }
+
+        function getConditionClass(condition) {
+            const lowerCondition = condition.toLowerCase();
+            if (lowerCondition.includes('new') || lowerCondition.includes('mint')) {
+                return 'badge-success';
+            } else if (lowerCondition.includes('very good') || lowerCondition.includes('excellent')) {
+                return 'badge-info';
+            } else if (lowerCondition.includes('good')) {
+                return 'badge-warning';
+            } else {
+                return 'badge-secondary';
+            }
+        }
+
+        function updateStats(data) {
+            totalScans++;
+            totalProfitableItems += data.opportunities_summary.total_opportunities;
+            totalProfit += data.opportunities_summary.total_opportunities * data.opportunities_summary.average_profit;
+            
+            document.getElementById('totalScans').textContent = totalScans;
+            document.getElementById('profitableItems').textContent = totalProfitableItems;
+            document.getElementById('avgProfit').textContent = `${(totalProfit / Math.max(totalProfitableItems, 1)).toFixed(0)}`;
+            document.getElementById('successRate').textContent = `${data.scan_metadata.scan_efficiency}%`;
+            
+            // Store stats
+            localStorage.setItem('flipHawkStats', JSON.stringify({
+                totalScans,
+                totalProfitableItems,
+                totalProfit
+            }));
+        }
+
+        function loadStoredStats() {
+            const stored = localStorage.getItem('flipHawkStats');
+            if (stored) {
+                const stats = JSON.parse(stored);
+                totalScans = stats.totalScans || 0;
+                totalProfitableItems = stats.totalProfitableItems || 0;
+                totalProfit = stats.totalProfit || 0;
+                
+                document.getElementById('totalScans').textContent = totalScans;
+                document.getElementById('profitableItems').textContent = totalProfitableItems;
+                document.getElementById('avgProfit').textContent = `${(totalProfit / Math.max(totalProfitableItems, 1)).toFixed(0)}`;
+            }
+        }
+
+        function displayError() {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">⚠️</div>
+                    <h3 class="empty-title">Scan Failed</h3>
+                    <p class="empty-text">There was an error processing your request. Please try again with different keywords or check your connection.</p>
+                    <button class="btn btn-primary" onclick="runQuickScan();">
+                        🔄 Try Quick Scan
+                    </button>
+                </div>
+            `;
+        }
+
+        async function flipToStore(itemId) {
+            showNotification('Creating FlipShip listing...', 'info');
+            
+            try {
+                // This would integrate with FlipShip API
+                const response = await fetch('/api/flipship/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        opportunity_id: itemId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showNotification('Successfully added to FlipShip store!', 'success');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error('FlipShip error:', error);
+                showNotification('Failed to create store listing', 'error');
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease-in';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 4000);
+        }
+
+        // Add some sample data for demo
+        function loadSampleData() {
+            const sampleData = {
+                scan_metadata: {
+                    duration_seconds: 12.5,
+                    total_searches_performed: 15,
+                    scan_efficiency: 78.3
+                },
+                opportunities_summary: {
+                    total_opportunities: 6,
+                    average_profit: 45.25
+                },
+                top_opportunities: [
+                    {
+                        item_id: 'sample_1',
+                        title: 'Apple AirPods Pro 2nd Generation with MagSafe Case - Brand New Sealed',
+                        price: 189.99,
+                        shipping_cost: 0,
+                        total_cost: 189.99,
+                        estimated_resale_price: 279.99,
+                        estimated_profit: 90.00,
+                        confidence_score: 92,
+                        condition: 'Brand New',
+                        seller_rating: '99.2%',
+                        ebay_link: 'https://ebay.com/item/sample1',
+                        image_url: 'https://via.placeholder.com/80x80/2563eb/ffffff?text=AirPods'
+                    },
+                    {
+                        item_id: 'sample_2',
+                        title: 'Nintendo Switch OLED Model Console Bundle with Games',
+                        price: 299.99,
+                        shipping_cost: 15.99,
+                        total_cost: 315.98,
+                        estimated_resale_price: 429.99,
+                        estimated_profit: 114.01,
+                        confidence_score: 88,
+                        condition: 'Like New',
+                        seller_rating: '98.5%',
+                        ebay_link: 'https://ebay.com/item/sample2',
+                        image_url: 'https://via.placeholder.com/80x80/10b981/ffffff?text=Switch'
+                    }
+                ]
+            };
+            
+            displayResults(sampleData);
+            updateStats(sampleData);
+        }
+
+        // Uncomment to load sample data for demo
+        // setTimeout(loadSampleData, 2000);
+    </script>
+</body>
+</html>
