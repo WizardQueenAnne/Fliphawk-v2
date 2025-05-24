@@ -302,7 +302,7 @@ class TrueArbitrageScanner:
             if price <= 0 or price > 10000:
                 return None
             
-            # Shipping cost
+            # Shipping cost - FIXED THE SYNTAX ERROR HERE
             shipping_cost = 0.0
             shipping_selectors = [
                 '.s-item__shipping',
@@ -316,7 +316,7 @@ class TrueArbitrageScanner:
                     if 'free' in shipping_text:
                         shipping_cost = 0.0
                         break
-                    elif ' in shipping_text:
+                    elif '$' in shipping_text:  # FIXED: Added missing '$' character
                         shipping_match = re.search(r'\$?([\d,]+\.?\d*)', shipping_text)
                         if shipping_match:
                             shipping_cost = float(shipping_match.group(1).replace(',', ''))
