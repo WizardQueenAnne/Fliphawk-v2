@@ -1,5 +1,5 @@
 """
-FlipHawk Flask Application - Enhanced with True Arbitrage Scanner
+FlipHawk Flask Application - Fixed with Debug Logging
 Main entry point for the web application with real arbitrage functionality
 """
 
@@ -12,16 +12,52 @@ from datetime import datetime
 import threading
 import time
 
-# Import the enhanced arbitrage scanner
+# Set up detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Import the enhanced arbitrage scanner with proper error handling
+scanner = None
+api_endpoints = None
+
 try:
+    logger.info("🔄 Attempting to import TrueArbitrageScanner...")
     from backend.scraper.enhanced_arbitrage_scanner import TrueArbitrageScanner, create_arbitrage_api_endpoints
+    
+    logger.info("✅ Import successful! Creating scanner instance...")
     scanner = TrueArbitrageScanner()
     api_endpoints = create_arbitrage_api_endpoints(scanner)
+    logger.info("✅ Real arbitrage scanner initialized successfully!")
     
-except ImportError:
-    # Fallback scanner for demo purposes
+except ImportError as e:
+    logger.error(f"❌ ImportError when loading scanner: {e}")
+    logger.error("📁 Check if backend/scraper/enhanced_arbitrage_scanner.py exists")
+    logger.error("📦 Check if all dependencies are installed")
+    scanner = None
+    api_endpoints = None
+    
+except SyntaxError as e:
+    logger.error(f"❌ SyntaxError in scanner file: {e}")
+    logger.error("🐛 There's a syntax error in enhanced_arbitrage_scanner.py")
+    scanner = None
+    api_endpoints = None
+    
+except Exception as e:
+    logger.error(f"❌ Unexpected error loading scanner: {e}")
+    logger.error(f"🔍 Error type: {type(e).__name__}")
+    scanner = None
+    api_endpoints = None
+
+# Only use fallback if real scanner completely failed
+if scanner is None:
+    logger.warning("⚠️ Using fallback demo data - REAL SCANNER FAILED TO LOAD!")
+    
     class FallbackArbitrageScanner:
         def scan_arbitrage_opportunities(self, **kwargs):
+            logger.warning("🎭 DEMO DATA BEING RETURNED - NOT REAL ARBITRAGE!")
             return {
                 'scan_metadata': {
                     'duration_seconds': 15.5,
@@ -44,7 +80,7 @@ except ImportError:
                 },
                 'top_opportunities': [
                     {
-                        'opportunity_id': 'ARB_1234567890_5678',
+                        'opportunity_id': 'DEMO_ARB_001',
                         'similarity_score': 0.92,
                         'confidence_score': 88,
                         'risk_level': 'LOW',
@@ -53,7 +89,7 @@ except ImportError:
                         'roi_percentage': 32.8,
                         'estimated_fees': 19.75,
                         'buy_listing': {
-                            'title': 'Apple AirPods Pro 2nd Generation with MagSafe Case - Brand New Sealed',
+                            'title': '⚠️ DEMO DATA - Apple AirPods Pro 2nd Generation',
                             'price': 189.99,
                             'shipping_cost': 0.00,
                             'total_cost': 189.99,
@@ -61,12 +97,12 @@ except ImportError:
                             'seller_rating': '99.2%',
                             'seller_feedback': '15847',
                             'location': 'California, USA',
-                            'image_url': 'https://via.placeholder.com/400x300/2563eb/ffffff?text=AirPods+Pro',
-                            'ebay_link': 'https://ebay.com/item/sample_buy_1',
-                            'item_id': 'buy_12345'
+                            'image_url': 'https://via.placeholder.com/400x300/ff6b6b/ffffff?text=DEMO+DATA',
+                            'ebay_link': 'https://ebay.com/item/demo_data',
+                            'item_id': 'demo_001'
                         },
                         'sell_reference': {
-                            'title': 'Apple AirPods Pro (2nd Generation) MagSafe Case - NEW',
+                            'title': '⚠️ DEMO DATA - Apple AirPods Pro Reference',
                             'price': 279.99,
                             'shipping_cost': 9.99,
                             'total_cost': 289.98,
@@ -74,62 +110,17 @@ except ImportError:
                             'seller_rating': '98.8%',
                             'seller_feedback': '8934',
                             'location': 'New York, USA',
-                            'image_url': 'https://via.placeholder.com/400x300/2563eb/ffffff?text=AirPods+Pro',
-                            'ebay_link': 'https://ebay.com/item/sample_sell_1',
-                            'item_id': 'sell_12345'
+                            'image_url': 'https://via.placeholder.com/400x300/ff6b6b/ffffff?text=DEMO+DATA',
+                            'ebay_link': 'https://ebay.com/item/demo_data',
+                            'item_id': 'demo_002'
                         },
                         'product_info': {
                             'brand': 'apple',
                             'model': 'airpods pro 2nd',
                             'category': 'Tech',
                             'subcategory': 'Headphones',
-                            'key_features': ['2nd generation', 'magsafe', 'pro'],
-                            'product_identifier': 'apple_airpods_pro_2nd'
-                        },
-                        'created_at': datetime.now().isoformat()
-                    },
-                    {
-                        'opportunity_id': 'ARB_1234567890_5679',
-                        'similarity_score': 0.89,
-                        'confidence_score': 85,
-                        'risk_level': 'LOW',
-                        'gross_profit': 75.00,
-                        'net_profit_after_fees': 52.80,
-                        'roi_percentage': 41.2,
-                        'estimated_fees': 22.20,
-                        'buy_listing': {
-                            'title': 'Nintendo Switch OLED Model Console - White',
-                            'price': 299.99,
-                            'shipping_cost': 12.99,
-                            'total_cost': 312.98,
-                            'condition': 'Like New',
-                            'seller_rating': '97.8%',
-                            'seller_feedback': '2456',
-                            'location': 'Texas, USA',
-                            'image_url': 'https://via.placeholder.com/400x300/10b981/ffffff?text=Switch+OLED',
-                            'ebay_link': 'https://ebay.com/item/sample_buy_2',
-                            'item_id': 'buy_12346'
-                        },
-                        'sell_reference': {
-                            'title': 'Nintendo Switch OLED Console System White Brand New',
-                            'price': 399.99,
-                            'shipping_cost': 0.00,
-                            'total_cost': 399.99,
-                            'condition': 'Brand New',
-                            'seller_rating': '99.5%',
-                            'seller_feedback': '12903',
-                            'location': 'Florida, USA',
-                            'image_url': 'https://via.placeholder.com/400x300/10b981/ffffff?text=Switch+OLED',
-                            'ebay_link': 'https://ebay.com/item/sample_sell_2',
-                            'item_id': 'sell_12346'
-                        },
-                        'product_info': {
-                            'brand': 'nintendo',
-                            'model': 'switch oled',
-                            'category': 'Gaming',
-                            'subcategory': 'Consoles',
-                            'key_features': ['oled', 'white', 'console'],
-                            'product_identifier': 'nintendo_switch_oled_white'
+                            'key_features': ['demo', 'data', 'only'],
+                            'product_identifier': 'demo_product'
                         },
                         'created_at': datetime.now().isoformat()
                     }
@@ -140,24 +131,27 @@ except ImportError:
     
     def create_fallback_endpoints(scanner):
         def scan_arbitrage_opportunities(request_data):
+            logger.warning("🎭 FALLBACK ENDPOINT CALLED - CHECK SCANNER IMPORT!")
             return {
                 'status': 'success',
                 'data': scanner.scan_arbitrage_opportunities(**request_data),
-                'message': 'Demo data loaded successfully'
+                'message': '⚠️ DEMO DATA - Real scanner failed to load!'
             }
         
         def quick_scan_endpoint():
+            logger.warning("🎭 FALLBACK QUICK SCAN - CHECK SCANNER IMPORT!")
             return {
                 'status': 'success',
                 'data': scanner.scan_arbitrage_opportunities(),
-                'message': 'Quick scan demo completed'
+                'message': '⚠️ DEMO DATA - Real scanner failed to load!'
             }
         
         def trending_scan_endpoint():
+            logger.warning("🎭 FALLBACK TRENDING SCAN - CHECK SCANNER IMPORT!")
             return {
                 'status': 'success',
                 'data': scanner.scan_arbitrage_opportunities(),
-                'message': 'Trending scan demo completed'
+                'message': '⚠️ DEMO DATA - Real scanner failed to load!'
             }
         
         return {
@@ -168,9 +162,11 @@ except ImportError:
     
     api_endpoints = create_fallback_endpoints(scanner)
 
+# FlipShip manager import
 try:
     from backend.flipship.product_manager import FlipShipProductManager
 except ImportError:
+    logger.warning("⚠️ FlipShip manager not found, using placeholder")
     class FlipShipProductManager:
         def __init__(self):
             self.products = []
@@ -184,13 +180,6 @@ except ImportError:
             pass
 
 from config import Config
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -208,10 +197,6 @@ CORS(app, resources={
 # Initialize components
 flipship_manager = FlipShipProductManager()
 
-# Global state for background scanning
-background_scan_active = False
-background_scan_results = None
-
 @app.route('/')
 def index():
     """Main landing page"""
@@ -223,7 +208,6 @@ def fliphawk():
     try:
         return render_template('fliphawk.html')
     except:
-        # Fallback template if fliphawk.html doesn't exist
         return render_template('index.html')
 
 @app.route('/flipship')
@@ -235,7 +219,6 @@ def flipship():
     except:
         return render_template('index.html')
 
-# Enhanced API Routes for True Arbitrage
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     """Get available categories and subcategories"""
@@ -289,9 +272,15 @@ def scan_arbitrage():
                 'errors': ['Keywords cannot be empty']
             }), 400
         
-        logger.info(f"Starting true arbitrage scan with keywords: {keywords}")
+        logger.info(f"🔍 Starting arbitrage scan with keywords: {keywords}")
         
-        # Use the enhanced arbitrage scanner
+        # Check if we're using real or demo scanner
+        if hasattr(scanner, '__class__') and 'Fallback' in scanner.__class__.__name__:
+            logger.warning("⚠️ USING DEMO SCANNER - REAL SCANNER FAILED TO LOAD!")
+        else:
+            logger.info("✅ Using real arbitrage scanner")
+        
+        # Use the scanner (real or fallback)
         result = api_endpoints['scan_arbitrage']({
             'keywords': keywords,
             'categories': categories,
@@ -318,6 +307,12 @@ def scan_arbitrage():
 def quick_scan():
     """Quick arbitrage scan with predefined parameters"""
     try:
+        logger.info("🚀 Quick scan requested")
+        
+        # Check scanner type
+        if hasattr(scanner, '__class__') and 'Fallback' in scanner.__class__.__name__:
+            logger.warning("⚠️ QUICK SCAN USING DEMO DATA!")
+        
         result = api_endpoints['quick_scan']()
         
         # Store results in session
@@ -339,6 +334,8 @@ def quick_scan():
 def trending_scan():
     """Scan with trending keywords"""
     try:
+        logger.info("📈 Trending scan requested")
+        
         result = api_endpoints['trending_scan']()
         
         # Store results in session
@@ -360,7 +357,6 @@ def trending_scan():
 def get_opportunity_details(opportunity_id):
     """Get detailed information about a specific arbitrage opportunity"""
     try:
-        # Check session storage
         last_results = session.get('last_scan_results', {})
         opportunities = last_results.get('top_opportunities', [])
         
@@ -391,14 +387,14 @@ def get_opportunity_details(opportunity_id):
 def get_session_stats():
     """Get current session statistics"""
     try:
-        # Basic stats - in real implementation, these would come from the scanner
         result = {
             'status': 'success',
             'data': {
                 'total_scans': session.get('total_scans', 0),
                 'total_opportunities_found': session.get('total_opportunities', 0),
                 'average_profit': session.get('average_profit', 0),
-                'uptime_seconds': 3600  # Placeholder
+                'uptime_seconds': 3600,
+                'scanner_type': 'DEMO' if (hasattr(scanner, '__class__') and 'Fallback' in scanner.__class__.__name__) else 'REAL'
             },
             'message': 'Session stats retrieved successfully'
         }
@@ -419,7 +415,6 @@ def get_session_stats():
             'data': None
         }), 500
 
-# FlipShip Integration Routes
 @app.route('/api/flipship/create', methods=['POST'])
 def create_flipship_product():
     """Create new FlipShip product from arbitrage opportunity"""
@@ -434,7 +429,7 @@ def create_flipship_product():
                 'data': None
             }), 400
         
-        # Get opportunity details
+        # Get opportunity details from session
         last_results = session.get('last_scan_results', {})
         opportunities = last_results.get('top_opportunities', [])
         opportunity = next((opp for opp in opportunities if opp['opportunity_id'] == opportunity_id), None)
@@ -446,7 +441,7 @@ def create_flipship_product():
                 'data': None
             }), 404
         
-        # Create FlipShip product from the buy listing
+        # Create FlipShip product
         product_data = {
             'title': opportunity['buy_listing']['title'],
             'total_cost': opportunity['buy_listing']['total_cost'],
@@ -594,9 +589,16 @@ def initialize_app():
     """Initialize application"""
     try:
         flipship_manager.initialize_sample_products()
-        logger.info("✅ FlipHawk server initialized successfully")
-        logger.info("🔍 True arbitrage scanner ready")
-        logger.info("🎯 API endpoints configured")
+        
+        # Log scanner status
+        if hasattr(scanner, '__class__') and 'Fallback' in scanner.__class__.__name__:
+            logger.warning("⚠️ FlipHawk using DEMO DATA - Real scanner failed!")
+            logger.warning("🔧 Check enhanced_arbitrage_scanner.py for errors")
+        else:
+            logger.info("✅ FlipHawk using REAL arbitrage scanner")
+        
+        logger.info("🚀 FlipHawk server initialized")
+        
     except Exception as e:
         logger.error(f"❌ Error during initialization: {e}")
 
@@ -606,7 +608,13 @@ with app.app_context():
 
 if __name__ == '__main__':
     logger.info("🚀 Starting FlipHawk Server...")
-    logger.info("📡 True arbitrage scanner ready")
+    
+    # Log final scanner status
+    if hasattr(scanner, '__class__') and 'Fallback' in scanner.__class__.__name__:
+        logger.warning("⚠️⚠️⚠️ USING DEMO DATA - REAL SCANNER FAILED! ⚠️⚠️⚠️")
+    else:
+        logger.info("✅ Real arbitrage scanner loaded successfully")
+    
     logger.info("🌐 Server available at http://localhost:5000")
     
     # Development server
