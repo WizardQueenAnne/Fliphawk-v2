@@ -11,34 +11,17 @@ import logging
 from datetime import datetime
 import threading
 import time
-import urllib.request
-import urllib.parse
-from bs4 import BeautifulSoup
-import re
-import random
-from typing import List, Dict, Optional
-import hashlib
-from dataclasses import dataclass, asdict
-import difflib
 
 # Import the enhanced arbitrage scanner
 try:
-    # Import your enhanced arbitrage scanner here
-    # from backend.scraper.enhanced_arbitrage_scanner import EnhancedArbitrageScanner, create_arbitrage_api_endpoints
+    from backend.scraper.enhanced_arbitrage_scanner import TrueArbitrageScanner, create_arbitrage_api_endpoints
+    scanner = TrueArbitrageScanner()
+    api_endpoints = create_arbitrage_api_endpoints(scanner)
     
-    # For now, we'll include a simplified version inline
-    class SimpleArbitrageScanner:
-        def __init__(self):
-            self.base_url = "https://www.ebay.com/sch/i.html"
-            self.headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            self.seen_items = set()
-        
-        def scan_arbitrage_opportunities(self, keywords: str, categories: List[str], 
-                                       min_profit: float = 15.0, max_results: int = 25) -> Dict:
-            """Simplified arbitrage scanner for demo"""
-            # This would be replaced with your enhanced scanner
+except ImportError:
+    # Fallback scanner for demo purposes
+    class FallbackArbitrageScanner:
+        def scan_arbitrage_opportunities(self, **kwargs):
             return {
                 'scan_metadata': {
                     'duration_seconds': 15.5,
@@ -65,12 +48,10 @@ try:
                         'similarity_score': 0.92,
                         'confidence_score': 88,
                         'risk_level': 'LOW',
-                        'profit_analysis': {
-                            'gross_profit': 65.00,
-                            'net_profit_after_fees': 45.25,
-                            'roi_percentage': 32.8,
-                            'estimated_fees': 19.75
-                        },
+                        'gross_profit': 65.00,
+                        'net_profit_after_fees': 45.25,
+                        'roi_percentage': 32.8,
+                        'estimated_fees': 19.75,
                         'buy_listing': {
                             'title': 'Apple AirPods Pro 2nd Generation with MagSafe Case - Brand New Sealed',
                             'price': 189.99,
@@ -112,12 +93,10 @@ try:
                         'similarity_score': 0.89,
                         'confidence_score': 85,
                         'risk_level': 'LOW',
-                        'profit_analysis': {
-                            'gross_profit': 75.00,
-                            'net_profit_after_fees': 52.80,
-                            'roi_percentage': 41.2,
-                            'estimated_fees': 22.20
-                        },
+                        'gross_profit': 75.00,
+                        'net_profit_after_fees': 52.80,
+                        'roi_percentage': 41.2,
+                        'estimated_fees': 22.20,
                         'buy_listing': {
                             'title': 'Nintendo Switch OLED Model Console - White',
                             'price': 299.99,
@@ -157,15 +136,37 @@ try:
                 ]
             }
     
-    scanner = SimpleArbitrageScanner()
+    scanner = FallbackArbitrageScanner()
     
-except ImportError:
-    # Fallback scanner
-    class SimpleArbitrageScanner:
-        def scan_arbitrage_opportunities(self, **kwargs):
-            return {'scan_metadata': {}, 'opportunities_summary': {}, 'top_opportunities': []}
+    def create_fallback_endpoints(scanner):
+        def scan_arbitrage_opportunities(request_data):
+            return {
+                'status': 'success',
+                'data': scanner.scan_arbitrage_opportunities(**request_data),
+                'message': 'Demo data loaded successfully'
+            }
+        
+        def quick_scan_endpoint():
+            return {
+                'status': 'success',
+                'data': scanner.scan_arbitrage_opportunities(),
+                'message': 'Quick scan demo completed'
+            }
+        
+        def trending_scan_endpoint():
+            return {
+                'status': 'success',
+                'data': scanner.scan_arbitrage_opportunities(),
+                'message': 'Trending scan demo completed'
+            }
+        
+        return {
+            'scan_arbitrage': scan_arbitrage_opportunities,
+            'quick_scan': quick_scan_endpoint,
+            'trending_scan': trending_scan_endpoint
+        }
     
-    scanner = SimpleArbitrageScanner()
+    api_endpoints = create_fallback_endpoints(scanner)
 
 try:
     from backend.flipship.product_manager import FlipShipProductManager
@@ -288,25 +289,20 @@ def scan_arbitrage():
                 'errors': ['Keywords cannot be empty']
             }), 400
         
-        logger.info(f"Starting arbitrage scan with keywords: {keywords}")
+        logger.info(f"Starting true arbitrage scan with keywords: {keywords}")
         
         # Use the enhanced arbitrage scanner
-        scan_results = scanner.scan_arbitrage_opportunities(
-            keywords=keywords,
-            categories=categories,
-            min_profit=min_profit,
-            max_results=max_results
-        )
-        
-        result = {
-            'status': 'success',
-            'data': scan_results,
-            'message': f'Found {scan_results["opportunities_summary"]["total_opportunities"]} arbitrage opportunities'
-        }
+        result = api_endpoints['scan_arbitrage']({
+            'keywords': keywords,
+            'categories': categories,
+            'min_profit': min_profit,
+            'max_results': max_results
+        })
         
         # Store results in session
-        session['last_scan_results'] = scan_results
-        session['scan_timestamp'] = datetime.now().isoformat()
+        if result['status'] == 'success':
+            session['last_scan_results'] = result['data']
+            session['scan_timestamp'] = datetime.now().isoformat()
         
         return jsonify(result)
         
@@ -322,18 +318,12 @@ def scan_arbitrage():
 def quick_scan():
     """Quick arbitrage scan with predefined parameters"""
     try:
-        scan_results = scanner.scan_arbitrage_opportunities(
-            keywords='airpods pro, nintendo switch',
-            categories=['Tech', 'Gaming'],
-            min_profit=20.0,
-            max_results=10
-        )
+        result = api_endpoints['quick_scan']()
         
-        result = {
-            'status': 'success',
-            'data': scan_results,
-            'message': f'Quick scan found {scan_results["opportunities_summary"]["total_opportunities"]} opportunities'
-        }
+        # Store results in session
+        if result['status'] == 'success':
+            session['last_scan_results'] = result['data']
+            session['scan_timestamp'] = datetime.now().isoformat()
         
         return jsonify(result)
         
@@ -349,20 +339,12 @@ def quick_scan():
 def trending_scan():
     """Scan with trending keywords"""
     try:
-        trending_keywords = "viral tiktok products, trending 2025, pokemon cards"
+        result = api_endpoints['trending_scan']()
         
-        scan_results = scanner.scan_arbitrage_opportunities(
-            keywords=trending_keywords,
-            categories=['Tech', 'Gaming', 'Collectibles'],
-            min_profit=20.0,
-            max_results=15
-        )
-        
-        result = {
-            'status': 'success',
-            'data': scan_results,
-            'message': f'Trending scan found {scan_results["opportunities_summary"]["total_opportunities"]} opportunities'
-        }
+        # Store results in session
+        if result['status'] == 'success':
+            session['last_scan_results'] = result['data']
+            session['scan_timestamp'] = datetime.now().isoformat()
         
         return jsonify(result)
         
@@ -378,8 +360,7 @@ def trending_scan():
 def get_opportunity_details(opportunity_id):
     """Get detailed information about a specific arbitrage opportunity"""
     try:
-        # In a real implementation, you'd fetch from database
-        # For now, check session storage
+        # Check session storage
         last_results = session.get('last_scan_results', {})
         opportunities = last_results.get('top_opportunities', [])
         
@@ -478,7 +459,7 @@ def create_flipship_product():
             'ebay_link': opportunity['buy_listing']['ebay_link'],
             'item_id': opportunity['buy_listing']['item_id'],
             'seller_rating': opportunity['buy_listing']['seller_rating'],
-            'estimated_profit': opportunity['profit_analysis']['net_profit_after_fees']
+            'estimated_profit': opportunity['net_profit_after_fees']
         }
         
         product = flipship_manager.create_product_from_opportunity(product_data)
@@ -488,8 +469,8 @@ def create_flipship_product():
             'data': {
                 'product_id': product.get('product_id', f'FS_{opportunity_id}'),
                 'opportunity_id': opportunity_id,
-                'estimated_profit': opportunity['profit_analysis']['net_profit_after_fees'],
-                'roi': opportunity['profit_analysis']['roi_percentage']
+                'estimated_profit': opportunity['net_profit_after_fees'],
+                'roi': opportunity['roi_percentage']
             },
             'message': 'Product created successfully for FlipShip'
         })
@@ -614,7 +595,7 @@ def initialize_app():
     try:
         flipship_manager.initialize_sample_products()
         logger.info("✅ FlipHawk server initialized successfully")
-        logger.info("🔍 Enhanced arbitrage scanner ready")
+        logger.info("🔍 True arbitrage scanner ready")
         logger.info("🎯 API endpoints configured")
     except Exception as e:
         logger.error(f"❌ Error during initialization: {e}")
@@ -625,7 +606,7 @@ with app.app_context():
 
 if __name__ == '__main__':
     logger.info("🚀 Starting FlipHawk Server...")
-    logger.info("📡 Enhanced arbitrage scanner ready")
+    logger.info("📡 True arbitrage scanner ready")
     logger.info("🌐 Server available at http://localhost:5000")
     
     # Development server
