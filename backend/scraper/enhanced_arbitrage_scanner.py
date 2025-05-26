@@ -1,4 +1,175 @@
-"""
+def calculate_arbitrage_confidence(self, buy_listing: eBayListing, sell_listing: eBayListing,
+                                     similarity_score: float, profit_analysis: Dict, risk_assessment: Dict) -> int:
+        """Calculate overall confidence in arbitrage opportunity with more generous scoring"""
+        confidence = 40  # Increased base confidence
+        
+        # Similarity bonus (more generous)
+        if similarity_score >= 0.8:
+            confidence += 25
+        elif similarity_score >= 0.6:
+            confidence += 20
+        elif similarity_score >= 0.5:
+            confidence += 15
+        elif similarity_score >= 0.4:
+            confidence += 10
+        elif similarity_score >= 0.35:
+            confidence += 5
+        
+        # Profit bonus (more accessible)
+        net_profit = profit_analysis['net_profit_after_fees']
+        if net_profit >= 100:
+            confidence += 25
+        elif net_profit >= 50:
+            confidence += 20
+        elif net_profit >= 30:
+            confidence += 15
+        elif net_profit >= 20:
+            confidence += 12
+        elif net_profit >= 15:
+            confidence += 10
+        elif net_profit >= 10:
+            confidence += 8
+        elif net_profit >= 8:
+            confidence += 5
+        
+        # ROI bonus (but penalize if too high)
+        roi = profit_analysis['roi_percentage']
+        if 20 <= roi <= 60:        # Sweet spot
+            confidence += 15
+        elif 10 <= roi <= 80:      # Good range
+            confidence += 10
+        elif 5 <= roi <= 100:      # Acceptable range
+            confidence += 5
+        elif roi > 200:            # Too high is suspicious
+            confidence -= 15
+        elif roi > 150:
+            confidence -= 10
+        
+        # Reduced risk penalty
+        confidence -= risk_assessment['score'] // 8  # Reduced from //5
+        
+        # Seller quality bonus (more forgiving)
+        try:
+            buy_rating = float(re.search(r'([\d.]+)', buy_listing.seller_rating).group(1))
+            if buy_rating >= 98:
+                confidence += 15
+            elif buy_rating >= 95:
+                confidence += 10
+            elif buy_rating >= 90:
+                confidence += 5
+            # No penalty for ratings above 85
+        except:
+            confidence -= 5  # Reduced penalty
+        
+        # Title similarity bonus
+        title_sim = difflib.SequenceMatcher(
+            None, buy_listing.title.lower(), sell_listing.title.lower()
+        ).ratio()
+        
+        if title_sim >= 0.7:
+            confidence += 10
+        elif title_sim >= 0.5:
+            confidence += 5
+        
+        # Price difference reasonableness bonus
+        price_diff = sell_listing.price - buy_listing.price
+        if 10 <= price_diff <= 100:  # Reasonable price differences
+            confidence += 10
+        elif 5 <= price_diff <= 200:
+            confidence += 5
+        
+        # Condition compatibility bonus
+        buy_cond = buy_listing.condition.lower()
+        sell_cond = sell_listing.condition.lower()
+        
+        if buy_cond == sell_cond:
+            confidence += 10
+        elif any(word in buy_cond for word in ['new', 'sealed']) and any(word in sell_cond for word in ['new', 'mint']):
+            confidence += 8
+        elif any(word in buy_cond for word in ['good', 'very good']) and any(word in sell_cond for word in ['good', 'excellent']):
+            confidence += 6
+        
+        return max(0, min(100, confidence))
+    
+    def scan_with_keyword_variations(self, base_keyword: str, category: str, 
+                                   subcategory: str = None, max_pages: int = 2, 
+                                   min_profit: float = 15.0) -> List[eBayListing]:
+        """Scan eBay using keyword variations for comprehensive coverage"""
+        logger.info(f"🔍 Scanning with keyword: '{base_keyword}' in {category}/{subcategory}")
+        
+        # Generate keyword variations (but limit them)
+        keyword_variations = self.keyword_generator.generate_keyword_variations(base_keyword)
+        trending_keywords = self.keyword_generator.generate_trending_keywords([base_keyword])
+        
+        # Combine and prioritize keywords (reduced to prevent over-scanning)
+        all_keywords = [base_keyword] + keyword_variations[:3] + trending_keywords[:2]
+        
+        all_listings = []
+        self.session_stats['categories_searched'].add(f"{category}/{subcategory or 'All'}")
+        
+        for keyword_index, keyword in enumerate(all_keywords[:6]):  # Further limited
+            try:
+                for page in range(1, max_pages + 1):
+                    try:
+                        url = self.build_search_url(keyword, page)
+                        soup = self.fetch_page_with_retry(url)
+                        
+                        if not soup:
+                            logger.warning(f"Failed to fetch page {page} for keyword '{keyword}'")
+                            break
+                        
+                        # Item container selectors
+                        item_selectors = [
+                            '.s-item__wrapper',
+                            '.s-item',
+                            '.srp-results .s-item'
+                        ]
+                        
+                        items = []
+                        for selector in item_selectors:
+                            items = soup.select(selector)
+                            if items:
+                                break
+                        
+                        if not items:
+                            logger.warning(f"No items found on page {page} for keyword '{keyword}'")
+                            break
+                        
+                        self.session_stats['total_searches'] += 1
+                        self.session_stats['total_listings_found'] += len(items)
+                        
+                        page_listings = 0
+                        for item in items:
+                            listing = self.extract_listing_data(
+                                item, category, subcategory or 'General', keyword
+                            )
+                            
+                            # More lenient profit requirement during collection
+                            if listing and listing.estimated_profit >= (min_profit * 0.5):  # 50% of target
+                                all_listings.append(listing)
+                                page_listings += 1
+                                self.session_stats['profitable_listings'] += 1
+                        
+                        logger.info(f"Page {page} for '{keyword}': {page_listings} listings found")
+                        
+                        # Smart rate limiting (reduced delays)
+                        delay = random.uniform(1.0, 2.0) + (keyword_index * 0.2)
+                        time.sleep(delay)
+                        
+                    except Exception as e:
+                        logger.error(f"Error scanning page {page} for keyword '{keyword}': {e}")
+                        continue
+                
+                # Reduced delay between keywords
+                keyword_delay = random.uniform(0.5, 1.5) + (keyword_index * 0.1)
+                time.sleep(keyword_delay)
+                
+            except Exception as e:
+                logger.error(f"Error processing keyword '{keyword}': {e}")
+                continue
+        
+        logger.info(f"Completed scan for '{base_keyword}': {len(all_listings)} total listings found")
+        return all_listings"""
 FlipHawk Enhanced eBay Arbitrage Scanner - Production Ready
 Advanced scraper with real arbitrage detection, intelligent matching, and comprehensive error handling
 """
@@ -782,10 +953,13 @@ class TrueArbitrageScanner:
         
         # Group listings by product similarity for comparison
         product_groups = self.group_similar_products(all_listings)
+        logger.info(f"📊 Created {len(product_groups)} product groups from {len(all_listings)} listings")
         
         for group_key, listings in product_groups.items():
             if len(listings) < 2:
                 continue
+            
+            logger.info(f"🔍 Analyzing group '{group_key}' with {len(listings)} listings")
             
             # Sort by total cost
             listings.sort(key=lambda x: x.total_cost)
@@ -793,11 +967,61 @@ class TrueArbitrageScanner:
             # Find arbitrage opportunities within the group
             for i, buy_listing in enumerate(listings[:-1]):
                 for sell_listing in listings[i+1:]:
+                    # Must have meaningful price difference
+                    price_diff = sell_listing.total_cost - buy_listing.total_cost
+                    if price_diff < 10.0:  # At least $10 difference
+                        continue
+                    
                     # Calculate actual arbitrage potential
                     arbitrage_data = self.analyze_arbitrage_pair(buy_listing, sell_listing)
                     
-                    if arbitrage_data and arbitrage_data['net_profit_after_fees'] >= 15.0:
+                    if arbitrage_data and arbitrage_data['net_profit_after_fees'] >= 10.0:  # Lowered from 15
                         opportunities.append(arbitrage_data)
+                        logger.info(f"✅ Found arbitrage: ${arbitrage_data['net_profit_after_fees']:.2f} profit")
+        
+        # Also try simple price-based arbitrage for same keywords
+        keyword_groups = defaultdict(list)
+        for listing in all_listings:
+            # Group by matched keyword for broader matching
+            keyword_groups[listing.matched_keyword.lower()].append(listing)
+        
+        for keyword, listings in keyword_groups.items():
+            if len(listings) < 2:
+                continue
+                
+            listings.sort(key=lambda x: x.total_cost)
+            
+            # Look for price gaps in same keyword searches
+            for i in range(len(listings) - 1):
+                buy_listing = listings[i]
+                for j in range(i + 1, min(i + 5, len(listings))):  # Check next 4 listings
+                    sell_listing = listings[j]
+                    
+                    price_diff = sell_listing.total_cost - buy_listing.total_cost
+                    if price_diff < 15.0:  # Skip small differences
+                        continue
+                    
+                    # Quick similarity check
+                    title_sim = difflib.SequenceMatcher(
+                        None, 
+                        buy_listing.title.lower(), 
+                        sell_listing.title.lower()
+                    ).ratio()
+                    
+                    if title_sim >= 0.4:  # Lowered threshold for broader matching
+                        arbitrage_data = self.analyze_arbitrage_pair(buy_listing, sell_listing)
+                        
+                        if arbitrage_data and arbitrage_data['net_profit_after_fees'] >= 10.0:
+                            # Check if we already have this opportunity
+                            exists = any(
+                                opp['buy_listing']['item_id'] == arbitrage_data['buy_listing']['item_id'] and
+                                opp['sell_reference']['item_id'] == arbitrage_data['sell_reference']['item_id']
+                                for opp in opportunities
+                            )
+                            
+                            if not exists:
+                                opportunities.append(arbitrage_data)
+                                logger.info(f"✅ Found keyword arbitrage: ${arbitrage_data['net_profit_after_fees']:.2f} profit")
         
         # Sort by profit and confidence
         opportunities.sort(
@@ -805,7 +1029,7 @@ class TrueArbitrageScanner:
             reverse=True
         )
         
-        logger.info(f"✅ Found {len(opportunities)} arbitrage opportunities")
+        logger.info(f"✅ Found {len(opportunities)} total arbitrage opportunities")
         return opportunities[:25]  # Return top 25 opportunities
     
     def group_similar_products(self, listings: List[eBayListing]) -> Dict[str, List[eBayListing]]:
@@ -822,26 +1046,70 @@ class TrueArbitrageScanner:
             # Extract model/version if present
             model = self.extract_model(listing.title)
             
-            # Create grouping key
+            # Create grouping key with multiple strategies
             key_parts = []
-            if brand:
+            
+            # Strategy 1: Brand + Model
+            if brand and model:
+                key_parts.append(f"{brand}_{model}")
+            elif brand:
                 key_parts.append(brand)
-            if model:
-                key_parts.append(model)
             
-            # Add key descriptive words (limit to prevent over-grouping)
-            descriptive_words = [word for word in title_words 
-                               if len(word) > 3 and word.isalpha()][:3]
-            key_parts.extend(descriptive_words)
+            # Strategy 2: Key product words (more flexible)
+            # Get most important words (longer than 3 chars, not common words)
+            important_words = []
+            common_words = {'with', 'from', 'this', 'that', 'your', 'will', 'have', 'been', 'they', 'were', 'said', 'each', 'which', 'their', 'time', 'more', 'very', 'what', 'know', 'just', 'first', 'into', 'over', 'think', 'also', 'back', 'after', 'work', 'well', 'year', 'come', 'where', 'much', 'way', 'get', 'use', 'man', 'new', 'now', 'old', 'see', 'him', 'two', 'how', 'its', 'who', 'oil', 'sit', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'may', 'say', 'she', 'use', 'him', 'way', 'too', 'any', 'may', 'try'}
             
-            group_key = '_'.join(key_parts).lower()
+            for word in title_words:
+                if (len(word) > 3 and 
+                    word.isalpha() and 
+                    word not in common_words and
+                    not word.isdigit()):
+                    important_words.append(word)
             
-            # Only group if key has sufficient information
-            if len(group_key) > 10:
-                groups[group_key].append(listing)
+            # Take top 3-4 most descriptive words
+            if important_words:
+                key_parts.extend(important_words[:4])
+            
+            # Create multiple grouping strategies
+            group_keys = []
+            
+            # Primary key: All key parts
+            if key_parts:
+                primary_key = '_'.join(key_parts[:3]).lower()  # Limit to prevent over-specificity
+                if len(primary_key) > 6:  # Ensure meaningful key
+                    group_keys.append(primary_key)
+            
+            # Secondary key: Just brand + first important word
+            if brand and important_words:
+                secondary_key = f"{brand}_{important_words[0]}".lower()
+                group_keys.append(secondary_key)
+            
+            # Tertiary key: First two important words
+            if len(important_words) >= 2:
+                tertiary_key = f"{important_words[0]}_{important_words[1]}".lower()
+                group_keys.append(tertiary_key)
+            
+            # Add to all relevant groups
+            for group_key in group_keys:
+                if group_key and len(group_key) > 5:  # Ensure meaningful grouping
+                    groups[group_key].append(listing)
         
         # Filter groups to only those with potential for arbitrage
-        filtered_groups = {k: v for k, v in groups.items() if len(v) >= 2}
+        filtered_groups = {}
+        for k, v in groups.items():
+            if len(v) >= 2:
+                # Sort by price to make arbitrage detection easier
+                v.sort(key=lambda x: x.total_cost)
+                # Only keep if there's meaningful price variation
+                price_range = v[-1].total_cost - v[0].total_cost
+                if price_range >= 10.0:  # At least $10 price difference
+                    filtered_groups[k] = v
+        
+        logger.info(f"📊 Created {len(filtered_groups)} product groups with price variation")
+        for k, v in list(filtered_groups.items())[:5]:  # Log first 5 groups
+            prices = [listing.total_cost for listing in v]
+            logger.info(f"   Group '{k}': {len(v)} items, prices ${min(prices):.2f}-${max(prices):.2f}")
         
         return filtered_groups
     
@@ -897,20 +1165,20 @@ class TrueArbitrageScanner:
         return None
     
     def analyze_arbitrage_pair(self, buy_listing: eBayListing, sell_listing: eBayListing) -> Optional[Dict]:
-        """Analyze a pair of listings for arbitrage potential"""
+        """Analyze a pair of listings for arbitrage potential with more flexible criteria"""
         try:
             # Calculate similarity score
             similarity_score = self.calculate_similarity(buy_listing, sell_listing)
             
-            # Require high similarity for true arbitrage
-            if similarity_score < 0.75:
+            # More flexible similarity requirement
+            if similarity_score < 0.35:  # Lowered from 0.75
                 return None
             
             # Calculate profit after fees
             profit_analysis = self.calculate_detailed_profit(buy_listing, sell_listing)
             
-            # Skip if not profitable enough
-            if profit_analysis['net_profit_after_fees'] < 15.0:
+            # More flexible profit requirement
+            if profit_analysis['net_profit_after_fees'] < 8.0:  # Lowered from 15.0
                 return None
             
             # Calculate risk assessment
@@ -921,8 +1189,8 @@ class TrueArbitrageScanner:
                 buy_listing, sell_listing, similarity_score, profit_analysis, risk_assessment
             )
             
-            # Skip low confidence opportunities
-            if confidence_score < 60:
+            # More flexible confidence requirement
+            if confidence_score < 40:  # Lowered from 60
                 return None
             
             return {
@@ -946,7 +1214,7 @@ class TrueArbitrageScanner:
             return None
     
     def calculate_similarity(self, listing1: eBayListing, listing2: eBayListing) -> float:
-        """Calculate similarity between two listings"""
+        """Calculate similarity between two listings with more flexible matching"""
         # Normalize titles
         title1_norm = self.normalize_title(listing1.title)
         title2_norm = self.normalize_title(listing2.title)
@@ -957,24 +1225,62 @@ class TrueArbitrageScanner:
         # Brand and model matching
         brand1 = self.extract_brand(listing1.title)
         brand2 = self.extract_brand(listing2.title)
-        brand_match = 1.0 if brand1 == brand2 else 0.0
+        
+        # More flexible brand matching
+        if brand1 and brand2:
+            brand_match = 1.0 if brand1 == brand2 else 0.0
+        elif brand1 or brand2:
+            brand_match = 0.3  # Partial credit if only one has identifiable brand
+        else:
+            brand_match = 0.5  # Neutral if neither has clear brand
         
         model1 = self.extract_model(listing1.title)
         model2 = self.extract_model(listing2.title)
-        model_match = 1.0 if model1 == model2 else 0.5
         
-        # Condition compatibility
+        if model1 and model2:
+            model_match = 1.0 if model1 == model2 else 0.3
+        elif model1 or model2:
+            model_match = 0.4
+        else:
+            model_match = 0.6  # Neutral if neither has clear model
+        
+        # Condition compatibility (more lenient)
         condition_compat = self.calculate_condition_compatibility(listing1.condition, listing2.condition)
         
-        # Weighted similarity score
+        # Check for common keywords in titles
+        words1 = set(title1_norm.split())
+        words2 = set(title2_norm.split())
+        common_words = words1.intersection(words2)
+        
+        # Filter meaningful common words
+        meaningful_common = [w for w in common_words if len(w) > 3]
+        keyword_overlap = len(meaningful_common) / max(len(words1), len(words2), 1)
+        
+        # Weighted similarity score (adjusted for more flexibility)
         similarity = (
-            title_similarity * 0.4 +
-            brand_match * 0.3 +
-            model_match * 0.2 +
-            condition_compat * 0.1
+            title_similarity * 0.3 +      # Reduced weight
+            brand_match * 0.25 +          # Reduced weight
+            model_match * 0.15 +          # Reduced weight
+            condition_compat * 0.1 +      # Reduced weight
+            keyword_overlap * 0.2         # Added keyword overlap
         )
         
-        return similarity
+        # Bonus for exact keyword matches in different words
+        title1_words = listing1.title.lower().split()
+        title2_words = listing2.title.lower().split()
+        
+        # Look for product-specific terms
+        product_terms = ['pro', 'max', 'plus', 'mini', 'air', 'ultra', 'lite', 'slim']
+        term_matches = 0
+        for term in product_terms:
+            if (any(term in word for word in title1_words) and 
+                any(term in word for word in title2_words)):
+                term_matches += 1
+        
+        if term_matches > 0:
+            similarity += 0.1 * min(term_matches, 2)  # Bonus up to 0.2
+        
+        return min(1.0, similarity)
     
     def calculate_condition_compatibility(self, condition1: str, condition2: str) -> float:
         """Calculate condition compatibility for arbitrage"""
@@ -1044,50 +1350,85 @@ class TrueArbitrageScanner:
         }
     
     def assess_risk(self, buy_listing: eBayListing, sell_listing: eBayListing, profit_analysis: Dict) -> Dict:
-        """Assess risk factors for arbitrage opportunity"""
+        """Assess risk factors for arbitrage opportunity with more balanced scoring"""
         risk_score = 0
         risk_factors = []
         
-        # High ROI risk (too good to be true)
-        if profit_analysis['roi_percentage'] > 200:
-            risk_score += 30
+        # High ROI risk (but more lenient)
+        if profit_analysis['roi_percentage'] > 300:  # Increased threshold
+            risk_score += 25  # Reduced penalty
             risk_factors.append("Very high ROI may indicate different products")
-        elif profit_analysis['roi_percentage'] > 100:
-            risk_score += 15
-            risk_factors.append("High ROI requires careful verification")
+        elif profit_analysis['roi_percentage'] > 150:  # Increased threshold
+            risk_score += 10  # Reduced penalty
+            risk_factors.append("High ROI requires verification")
         
-        # Seller risk
+        # Seller risk (more lenient)
         try:
             buy_rating = float(re.search(r'([\d.]+)', buy_listing.seller_rating).group(1))
-            if buy_rating < 95:
-                risk_score += 20
+            if buy_rating < 90:  # Lowered threshold
+                risk_score += 15  # Reduced penalty
                 risk_factors.append("Lower seller rating")
+            elif buy_rating < 95:
+                risk_score += 5   # Minor penalty
+                risk_factors.append("Moderate seller rating")
         except:
-            risk_score += 15
+            risk_score += 10  # Reduced penalty
             risk_factors.append("Unknown seller rating")
         
-        # Price point risk
-        if buy_listing.total_cost > 500:
+        # Price point risk (more balanced)
+        if buy_listing.total_cost > 1000:  # Increased threshold
             risk_score += 15
             risk_factors.append("High-value item requires more capital")
-        elif buy_listing.total_cost < 20:
+        elif buy_listing.total_cost < 10:  # Lowered threshold
             risk_score += 10
-            risk_factors.append("Low-value item may have hidden issues")
+            risk_factors.append("Very low-value item may have hidden issues")
         
-        # Condition mismatch risk
+        # Condition mismatch risk (reduced)
         if buy_listing.condition.lower() != sell_listing.condition.lower():
-            risk_score += 20
-            risk_factors.append("Different conditions between buy/sell")
+            # Check if conditions are compatible
+            compatible_conditions = [
+                (['new', 'brand new', 'sealed'], ['new', 'brand new', 'sealed', 'mint']),
+                (['used', 'good', 'very good'], ['used', 'good', 'very good', 'excellent']),
+                (['like new', 'excellent'], ['like new', 'excellent', 'very good'])
+            ]
+            
+            buy_cond = buy_listing.condition.lower()
+            sell_cond = sell_listing.condition.lower()
+            
+            is_compatible = False
+            for group1, group2 in compatible_conditions:
+                if (any(c in buy_cond for c in group1) and any(c in sell_cond for c in group2)) or \
+                   (any(c in sell_cond for c in group1) and any(c in buy_cond for c in group2)):
+                    is_compatible = True
+                    break
+            
+            if not is_compatible:
+                risk_score += 15  # Reduced from 20
+                risk_factors.append("Different conditions between buy/sell")
+            else:
+                risk_score += 5   # Minor penalty for compatible conditions
+                risk_factors.append("Compatible but different conditions")
         
-        # Location risk
+        # Location risk (reduced)
         if 'china' in buy_listing.location.lower() or 'hong kong' in buy_listing.location.lower():
-            risk_score += 10
+            risk_score += 5  # Reduced from 10
             risk_factors.append("International shipping may cause delays")
         
-        # Determine risk level
-        if risk_score <= 20:
+        # Similarity-based risk adjustment
+        # If items are very similar in title, reduce risk
+        title_sim = difflib.SequenceMatcher(
+            None, buy_listing.title.lower(), sell_listing.title.lower()
+        ).ratio()
+        
+        if title_sim >= 0.7:
+            risk_score = max(0, risk_score - 10)  # Reduce risk for very similar titles
+        elif title_sim >= 0.5:
+            risk_score = max(0, risk_score - 5)   # Slight risk reduction
+        
+        # Determine risk level with adjusted thresholds
+        if risk_score <= 15:      # Lowered threshold
             risk_level = "LOW"
-        elif risk_score <= 50:
+        elif risk_score <= 35:    # Lowered threshold
             risk_level = "MEDIUM"
         else:
             risk_level = "HIGH"
