@@ -1,5 +1,5 @@
 """
-FlipHawk Flask Application - Updated with eBay Browse API Integration
+FlipHawk Flask Application - Fixed Syntax Error
 Main entry point for the web application with real eBay API functionality
 """
 
@@ -101,6 +101,14 @@ def flipship():
     try:
         products = flipship_manager.get_featured_products()
         return render_template('flipship.html', products=products)
+    except:
+        return render_template('index.html')
+
+@app.route('/ebay_search')
+def ebay_search():
+    """eBay search interface"""
+    try:
+        return render_template('ebay_search.html')
     except:
         return render_template('index.html')
 
@@ -661,7 +669,7 @@ def not_found(error):
             'data': None
         }), 404
     
-    return """
+    return render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
@@ -701,7 +709,7 @@ def not_found(error):
         <a href="/">Go Home</a>
     </body>
     </html>
-    """, 404
+    """), 404
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -714,7 +722,7 @@ def internal_error(error):
             'data': None
         }), 500
     
-    return """
+    return render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
@@ -754,7 +762,7 @@ def internal_error(error):
         <a href="/">Go Home</a>
     </body>
     </html>
-    """, 500
+    """), 500
 
 # Initialize the app
 def initialize_app():
@@ -796,4 +804,4 @@ if __name__ == '__main__':
         port=int(os.environ.get('PORT', 5000)),
         debug=os.environ.get('FLASK_ENV') == 'development',
         threaded=True
-    )'
+    )
