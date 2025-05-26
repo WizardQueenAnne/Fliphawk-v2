@@ -228,11 +228,17 @@
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            border: none;
         }
 
         .btn-primary:hover {
             transform: translateY(-3px);
             box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-primary:active {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
 
         .btn:disabled {
@@ -470,6 +476,118 @@
             background: linear-gradient(135deg, var(--accent), #0891b2);
         }
 
+        /* Quick Search Buttons */
+        .quick-search-container {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .quick-search-title {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-align: center;
+        }
+
+        .quick-search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .quick-search-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.875rem 1.25rem;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            min-height: 48px;
+        }
+
+        .quick-search-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.15), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .quick-search-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25);
+            color: var(--primary);
+        }
+
+        .quick-search-btn:hover::before {
+            left: 100%;
+        }
+
+        .quick-search-btn:active {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .quick-search-btn:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        /* Icon styling for quick search buttons */
+        .quick-search-btn .icon {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        .quick-search-btn:hover .icon {
+            opacity: 1;
+            transform: scale(1.1);
+            transition: all 0.3s ease;
+        }
+
+        /* Responsive adjustments for quick search */
+        @media (max-width: 768px) {
+            .quick-search-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+            
+            .quick-search-btn {
+                padding: 0.75rem 1rem;
+                font-size: 0.8rem;
+                min-height: 44px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .quick-search-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -558,7 +676,7 @@
                     <div class="empty-icon">🎯</div>
                     <h3 class="empty-title">Ready to Find Deals</h3>
                     <p class="empty-text">Enter keywords above to search for live eBay listings. Our scanner will find the best deals sorted by price.</p>
-                    <button class="btn btn-primary" onclick="document.getElementById('searchForm').requestSubmit();">
+                    <button class="btn btn-primary" onclick="startSearch('airpods pro')">
                         🚀 Start Your First Search
                     </button>
                 </div>
@@ -686,7 +804,7 @@
                         <div class="empty-icon">😔</div>
                         <h3 class="empty-title">No Listings Found</h3>
                         <p class="empty-text">Try different keywords or check your spelling. eBay might not have any listings matching your search.</p>
-                        <button class="btn btn-primary" onclick="searchSample();">
+                        <button class="btn btn-primary" onclick="quickSearch('airpods pro')">
                             🔄 Try Sample Search
                         </button>
                     </div>
@@ -771,16 +889,11 @@
                     <div class="empty-icon">⚠️</div>
                     <h3 class="empty-title">Search Failed</h3>
                     <p class="empty-text">There was an error processing your request. Please try again with different keywords or check your connection.</p>
-                    <button class="btn btn-primary" onclick="searchSample();">
+                    <button class="btn btn-primary" onclick="quickSearch('airpods pro')">
                         🔄 Try Sample Search
                     </button>
                 </div>
             `;
-        }
-
-        function searchSample() {
-            document.getElementById('keywords').value = 'airpods pro';
-            document.getElementById('searchForm').requestSubmit();
         }
 
         function addToWatchlist(itemId) {
@@ -820,22 +933,67 @@
             const searchSection = document.querySelector('.search-section');
             const quickSearchDiv = document.createElement('div');
             quickSearchDiv.innerHTML = `
-                <div style="margin-top: 1rem; text-align: center;">
-                    <h4 style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Quick Searches:</h4>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
-                        <button class="btn btn-small" onclick="quickSearch('airpods pro')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">AirPods Pro</button>
-                        <button class="btn btn-small" onclick="quickSearch('nintendo switch')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">Nintendo Switch</button>
-                        <button class="btn btn-small" onclick="quickSearch('pokemon cards')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">Pokemon Cards</button>
-                        <button class="btn btn-small" onclick="quickSearch('iphone 14')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">iPhone 14</button>
+                <div class="quick-search-container">
+                    <h4 class="quick-search-title">🔥 Popular Searches</h4>
+                    <div class="quick-search-grid">
+                        <button class="quick-search-btn" data-keyword="airpods pro">
+                            <span class="icon">🎧</span>
+                            <span>AirPods Pro</span>
+                        </button>
+                        <button class="quick-search-btn" data-keyword="nintendo switch">
+                            <span class="icon">🎮</span>
+                            <span>Nintendo Switch</span>
+                        </button>
+                        <button class="quick-search-btn" data-keyword="pokemon cards">
+                            <span class="icon">🃏</span>
+                            <span>Pokemon Cards</span>
+                        </button>
+                        <button class="quick-search-btn" data-keyword="iphone 14">
+                            <span class="icon">📱</span>
+                            <span>iPhone 14</span>
+                        </button>
+                        <button class="quick-search-btn" data-keyword="macbook">
+                            <span class="icon">💻</span>
+                            <span>MacBook</span>
+                        </button>
+                        <button class="quick-search-btn" data-keyword="jordan sneakers">
+                            <span class="icon">👟</span>
+                            <span>Jordan Sneakers</span>
+                        </button>
                     </div>
                 </div>
             `;
             searchSection.appendChild(quickSearchDiv);
+            
+            // Add event listeners to quick search buttons
+            const quickButtons = quickSearchDiv.querySelectorAll('.quick-search-btn');
+            quickButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const keyword = this.getAttribute('data-keyword');
+                    quickSearch(keyword);
+                });
+                
+                // Add loading state when clicked
+                button.addEventListener('click', function() {
+                    if (!isSearching) {
+                        this.style.opacity = '0.7';
+                        this.style.transform = 'scale(0.95)';
+                        setTimeout(() => {
+                            this.style.opacity = '1';
+                            this.style.transform = 'scale(1)';
+                        }, 200);
+                    }
+                });
+            });
         }
 
         function quickSearch(keyword) {
+            if (isSearching) return;
+            
             document.getElementById('keywords').value = keyword;
-            document.getElementById('searchForm').requestSubmit();
+            
+            // Trigger the search
+            startSearch(keyword);
         }
 
         // Add quick search buttons after page loads
