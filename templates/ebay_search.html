@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlipHawk - eBay Arbitrage Scanner</title>
+    <title>FlipHawk - eBay Deal Scanner</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
@@ -74,12 +74,17 @@
             66% { transform: translate(-20px, 20px) rotate(240deg); }
         }
 
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
         /* Header */
         .header {
-            position: relative;
-            padding: 2rem 0;
             text-align: center;
-            margin-bottom: 3rem;
+            padding: 2rem 0 3rem;
         }
 
         .logo {
@@ -90,14 +95,19 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
             margin-bottom: 0.5rem;
-            text-shadow: 0 0 50px rgba(102, 126, 234, 0.5);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.5)); }
+            to { filter: drop-shadow(0 0 30px rgba(102, 126, 234, 0.8)); }
         }
 
         .tagline {
             font-size: 1.25rem;
             color: var(--text-secondary);
             font-weight: 500;
-            opacity: 0.9;
+            margin-bottom: 1rem;
         }
 
         .api-badge {
@@ -108,7 +118,6 @@
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
-            margin-top: 1rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             animation: pulse 2s infinite;
@@ -117,13 +126,6 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.8; transform: scale(1.05); }
-        }
-
-        /* Container */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
         }
 
         /* Search Section */
@@ -154,11 +156,13 @@
             background-clip: text;
         }
 
+        /* Search Form */
         .search-form {
             display: grid;
             grid-template-columns: 1fr auto;
             gap: 1rem;
             align-items: end;
+            margin-bottom: 2rem;
         }
 
         .form-group {
@@ -175,7 +179,7 @@
             letter-spacing: 0.05em;
         }
 
-        .form-input, .form-select {
+        .form-input {
             padding: 1rem 1.25rem;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
@@ -186,7 +190,7 @@
             backdrop-filter: blur(10px);
         }
 
-        .form-input:focus, .form-select:focus {
+        .form-input:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
@@ -197,51 +201,112 @@
             color: var(--text-muted);
         }
 
-        /* Category Selector */
-        .category-section {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border);
+        /* Categories */
+        .categories-section {
+            margin-bottom: 2rem;
         }
 
         .category-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
         }
 
-        .category-btn {
+        .category-card {
             background: var(--surface);
             border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 1rem;
             border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .category-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .category-card:hover::before {
+            left: 100%;
+        }
+
+        .category-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: var(--surface-hover);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        }
+
+        .category-card.active {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .category-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .category-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Subcategories */
+        .subcategory-section {
+            margin-top: 1rem;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .subcategory-section.active {
+            opacity: 1;
+            max-height: 200px;
+        }
+
+        .subcategory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .subcategory-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
         }
 
-        .category-btn:hover {
+        .subcategory-btn:hover {
             background: var(--surface-hover);
             border-color: var(--primary);
             transform: translateY(-2px);
+            color: var(--primary);
         }
 
-        .category-btn.active {
+        .subcategory-btn.active {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             border-color: var(--primary);
             color: white;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .category-icon {
-            font-size: 1.5rem;
         }
 
         /* Button */
@@ -306,6 +371,53 @@
             transform: none !important;
         }
 
+        /* Quick Search */
+        .quick-search {
+            border-top: 1px solid var(--border);
+            padding-top: 1.5rem;
+        }
+
+        .quick-search-title {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-align: center;
+        }
+
+        .quick-search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .quick-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .quick-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25);
+            color: var(--primary);
+        }
+
         /* Loading Spinner */
         .spinner {
             width: 20px;
@@ -364,6 +476,12 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            animation: slideInUp 0.6s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .listing-card::before {
@@ -465,6 +583,7 @@
             padding: 0.5rem 1rem;
             font-size: 0.8rem;
             border-radius: 12px;
+            flex: 1;
         }
 
         .btn-ebay {
@@ -523,6 +642,11 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
         .notification-success {
             background: linear-gradient(135deg, var(--success), #059669);
         }
@@ -533,54 +657,6 @@
 
         .notification-info {
             background: linear-gradient(135deg, var(--accent), #0891b2);
-        }
-
-        /* Quick Search Buttons */
-        .quick-search-container {
-            margin-top: 2rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .quick-search-title {
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            text-align: center;
-        }
-
-        .quick-search-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 0.75rem;
-        }
-
-        .quick-search-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 0.875rem 1.25rem;
-            border-radius: 16px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .quick-search-btn:hover {
-            background: var(--surface-hover);
-            border-color: var(--primary);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25);
-            color: var(--primary);
         }
 
         /* Responsive Design */
@@ -628,25 +704,6 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.6s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .slide-in {
-            animation: slideIn 0.4s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
     </style>
 </head>
 <body>
@@ -656,13 +713,13 @@
         <!-- Header -->
         <header class="header">
             <h1 class="logo">🦅 FlipHawk</h1>
-            <p class="tagline">Real-Time eBay Arbitrage Scanner</p>
+            <p class="tagline">Real-Time eBay Deal Scanner</p>
             <div class="api-badge">✅ eBay Browse API Powered</div>
         </header>
 
         <!-- Search Section -->
         <div class="search-section">
-            <h2 class="search-title">🔍 Search eBay for Arbitrage Opportunities</h2>
+            <h2 class="search-title">🔍 Search eBay for Great Deals</h2>
             
             <form class="search-form" id="searchForm">
                 <div class="form-group">
@@ -676,54 +733,61 @@
                 </button>
             </form>
 
-            <!-- Category Selection -->
-            <div class="category-section">
-                <label class="form-label">📂 Quick Categories</label>
-                <div class="category-grid">
-                    <button type="button" class="category-btn" data-category="Tech">
+            <!-- Categories -->
+            <div class="categories-section">
+                <label class="form-label">📂 Browse by Category</label>
+                <div class="category-grid" id="categoryGrid">
+                    <div class="category-card" data-category="Tech">
                         <span class="category-icon">💻</span>
-                        <span>Tech</span>
-                    </button>
-                    <button type="button" class="category-btn" data-category="Gaming">
+                        <span class="category-name">Tech</span>
+                    </div>
+                    <div class="category-card" data-category="Gaming">
                         <span class="category-icon">🎮</span>
-                        <span>Gaming</span>
-                    </button>
-                    <button type="button" class="category-btn" data-category="Collectibles">
+                        <span class="category-name">Gaming</span>
+                    </div>
+                    <div class="category-card" data-category="Collectibles">
                         <span class="category-icon">🃏</span>
-                        <span>Cards</span>
-                    </button>
-                    <button type="button" class="category-btn" data-category="Fashion">
+                        <span class="category-name">Collectibles</span>
+                    </div>
+                    <div class="category-card" data-category="Fashion">
                         <span class="category-icon">👟</span>
-                        <span>Fashion</span>
-                    </button>
+                        <span class="category-name">Fashion</span>
+                    </div>
+                </div>
+
+                <!-- Subcategories -->
+                <div class="subcategory-section" id="subcategorySection">
+                    <div class="subcategory-grid" id="subcategoryGrid">
+                        <!-- Dynamically populated -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Quick Search Buttons -->
-            <div class="quick-search-container">
+            <!-- Quick Search -->
+            <div class="quick-search">
                 <h4 class="quick-search-title">🔥 Popular Searches</h4>
                 <div class="quick-search-grid">
-                    <button class="quick-search-btn" data-keyword="airpods pro">
+                    <button class="quick-btn" data-keyword="airpods pro">
                         <span>🎧</span>
                         <span>AirPods Pro</span>
                     </button>
-                    <button class="quick-search-btn" data-keyword="nintendo switch">
+                    <button class="quick-btn" data-keyword="nintendo switch">
                         <span>🎮</span>
                         <span>Nintendo Switch</span>
                     </button>
-                    <button class="quick-search-btn" data-keyword="pokemon cards">
+                    <button class="quick-btn" data-keyword="pokemon cards">
                         <span>🃏</span>
                         <span>Pokemon Cards</span>
                     </button>
-                    <button class="quick-search-btn" data-keyword="iphone 14">
+                    <button class="quick-btn" data-keyword="iphone 14">
                         <span>📱</span>
                         <span>iPhone 14</span>
                     </button>
-                    <button class="quick-search-btn" data-keyword="macbook">
+                    <button class="quick-btn" data-keyword="macbook">
                         <span>💻</span>
                         <span>MacBook</span>
                     </button>
-                    <button class="quick-search-btn" data-keyword="jordan sneakers">
+                    <button class="quick-btn" data-keyword="jordan sneakers">
                         <span>👟</span>
                         <span>Jordan Sneakers</span>
                     </button>
@@ -741,8 +805,8 @@
             <div id="resultsContainer">
                 <div class="empty-state">
                     <div class="empty-icon">🎯</div>
-                    <h3 class="empty-title">Ready to Find Deals</h3>
-                    <p class="empty-text">Enter keywords above to search for live eBay listings. Our scanner will find the best deals sorted by price using the official eBay Browse API.</p>
+                    <h3 class="empty-title">Ready to Find Amazing Deals</h3>
+                    <p class="empty-text">Enter keywords above or select a category to search for live eBay listings. Our scanner will find the best deals sorted by price using the official eBay Browse API.</p>
                     <button class="btn btn-primary" onclick="quickSearch('airpods pro')">
                         🚀 Start Your First Search
                     </button>
@@ -755,31 +819,36 @@
         // Global state
         let isSearching = false;
         let selectedCategory = null;
+        let selectedSubcategory = null;
+        let categories = {};
+
+        // Subcategory mappings
+        const subcategoryMappings = {
+            Tech: ['Headphones', 'Smartphones', 'Laptops', 'Graphics Cards', 'Tablets'],
+            Gaming: ['Consoles', 'Video Games', 'Gaming Accessories'],
+            Collectibles: ['Trading Cards', 'Action Figures', 'Coins'],
+            Fashion: ['Sneakers', 'Designer Clothing', 'Watches']
+        };
 
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
+            loadCategories();
         });
 
         function setupEventListeners() {
             // Form submission
             document.getElementById('searchForm').addEventListener('submit', handleSearch);
             
-            // Category buttons
-            document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    // Toggle category selection
-                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    selectedCategory = this.dataset.category;
-                    
-                    // Update search input with category-specific keywords
-                    updateKeywordsForCategory(selectedCategory);
+            // Category cards
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    selectCategory(this.dataset.category);
                 });
             });
             
             // Quick search buttons
-            document.querySelectorAll('.quick-search-btn').forEach(btn => {
+            document.querySelectorAll('.quick-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const keyword = this.dataset.keyword;
                     quickSearch(keyword);
@@ -794,18 +863,72 @@
             });
         }
 
-        function updateKeywordsForCategory(category) {
-            const keywordSuggestions = {
-                'Tech': 'airpods pro, macbook, iphone 14',
-                'Gaming': 'nintendo switch, ps5, xbox series x',
-                'Collectibles': 'pokemon cards, magic cards, baseball cards',
-                'Fashion': 'jordan sneakers, supreme, yeezy'
-            };
-            
-            const input = document.getElementById('keywords');
-            if (!input.value.trim()) {
-                input.placeholder = `e.g., ${keywordSuggestions[category] || 'enter keywords...'}`;
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    categories = result.data.categories;
+                    console.log('Categories loaded:', categories);
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
             }
+        }
+
+        function selectCategory(category) {
+            // Update UI
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.querySelector(`[data-category="${category}"]`).classList.add('active');
+            
+            selectedCategory = category;
+            selectedSubcategory = null;
+            
+            // Show subcategories
+            showSubcategories(category);
+        }
+
+        function showSubcategories(category) {
+            const subcategorySection = document.getElementById('subcategorySection');
+            const subcategoryGrid = document.getElementById('subcategoryGrid');
+            
+            const subcats = subcategoryMappings[category] || [];
+            
+            subcategoryGrid.innerHTML = subcats.map(subcat => `
+                <button class="subcategory-btn" data-subcategory="${subcat}">
+                    ${subcat}
+                </button>
+            `).join('');
+            
+            // Add event listeners to subcategory buttons
+            subcategoryGrid.querySelectorAll('.subcategory-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectSubcategory(this.dataset.subcategory);
+                });
+            });
+            
+            subcategorySection.classList.add('active');
+        }
+
+        function selectSubcategory(subcategory) {
+            document.querySelectorAll('.subcategory-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-subcategory="${subcategory}"]`).classList.add('active');
+            
+            selectedSubcategory = subcategory;
+            
+            // Auto-search when category+subcategory selected
+            if (selectedCategory && selectedSubcategory) {
+                searchByCategory();
+            }
+        }
+
+        async function searchByCategory() {
+            await startSearch(null, selectedCategory, selectedSubcategory);
         }
 
         async function handleSearch(event) {
@@ -820,7 +943,7 @@
                 return;
             }
 
-            await startSearch(keywords, selectedCategory);
+            await startSearch(keywords);
         }
 
         async function quickSearch(keywords) {
@@ -830,15 +953,20 @@
             await startSearch(keywords);
         }
 
-        async function startSearch(keywords, category = null) {
+        async function startSearch(keywords, category = null, subcategory = null) {
             isSearching = true;
             updateSearchButton(true);
-            showNotification('Searching eBay listings...', 'info');
+            
+            const searchType = keywords ? 'keywords' : 'category';
+            const searchTerm = keywords || `${category} → ${subcategory}`;
+            
+            showNotification(`Searching eBay for ${searchTerm}...`, 'info');
 
             try {
                 const searchData = {
                     keyword: keywords,
                     category: category,
+                    subcategory: subcategory,
                     limit: 20,
                     sort: 'price'
                 };
@@ -909,9 +1037,6 @@
                         ${listings.map(listing => createListingCard(listing)).join('')}
                     </div>
                 `;
-                
-                // Add fade-in animation
-                container.classList.add('fade-in');
             } else {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -941,7 +1066,7 @@
             const itemId = listing.item_id || 'unknown';
             
             return `
-                <div class="listing-card slide-in">
+                <div class="listing-card">
                     <div class="listing-header">
                         <img src="${imageUrl}" 
                              alt="Product" class="listing-image" 
@@ -984,11 +1109,8 @@
                         <a href="${ebayLink}" target="_blank" class="btn btn-ebay btn-small">
                             🛒 View on eBay
                         </a>
-                        <button class="btn btn-secondary btn-small" onclick="addToWatchlist('${itemId}')">
+                        <button class="btn btn-secondary btn-small" onclick="watchItem('${itemId}')">
                             👁️ Watch Item
-                        </button>
-                        <button class="btn btn-primary btn-small" onclick="analyzeArbitrage('${itemId}')">
-                            📊 Analyze
                         </button>
                     </div>
                 </div>
@@ -1013,14 +1135,8 @@
             `;
         }
 
-        function addToWatchlist(itemId) {
+        function watchItem(itemId) {
             showNotification(`Added item ${itemId} to watchlist!`, 'success');
-            // Here you could implement actual watchlist functionality
-        }
-
-        function analyzeArbitrage(itemId) {
-            showNotification(`Analyzing arbitrage potential for item ${itemId}...`, 'info');
-            // Here you could implement arbitrage analysis
         }
 
         function showNotification(message, type = 'info') {
@@ -1039,16 +1155,6 @@
                 }, 300);
             }, 4000);
         }
-
-        // Add slideOutRight animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideOutRight {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
     </script>
 </body>
 </html>
