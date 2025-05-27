@@ -1,1023 +1,682 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlipHawk - Real-Time Arbitrage Scanner</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+#!/usr/bin/env python3
+"""
+FlipHawk Real-Time eBay Scraper
+NO DUMMY DATA - REAL eBay listings only through web scraping
+"""
+
+import requests
+import json
+import time
+import re
+import logging
+from typing import List, Dict, Optional
+from datetime import datetime
+from urllib.parse import urlencode, quote_plus
+from bs4 import BeautifulSoup
+import random
+from dataclasses import dataclass, asdict
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class eBayListing:
+    """Real eBay listing data structure"""
+    item_id: str
+    title: str
+    price: float
+    shipping_cost: float
+    total_cost: float
+    condition: str
+    seller_username: str
+    seller_rating: str
+    seller_feedback: str
+    image_url: str
+    ebay_link: str
+    location: str
+    listing_date: str
+    watchers: str
+    bids: str
+    time_left: str
+    is_auction: bool
+    buy_it_now_available: bool
+
+class RealTimeeBayScraper:
+    """Real-time eBay scraper using web scraping (no API needed)"""
+    
+    def __init__(self):
+        self.base_url = "https://www.ebay.com"
+        self.search_url = f"{self.base_url}/sch/i.html"
         
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --primary: #667eea;
-            --secondary: #764ba2;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --accent: #06b6d4;
-            
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --surface: rgba(255, 255, 255, 0.05);
-            --surface-hover: rgba(255, 255, 255, 0.1);
-            --border: rgba(255, 255, 255, 0.1);
-            
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-muted: #64748b;
-            
-            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        .header {
-            text-align: center;
-            padding: 2rem 0 3rem;
-        }
-
-        .logo {
-            font-size: 3.5rem;
-            font-weight: 900;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .tagline {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-            margin-bottom: 1rem;
-        }
-
-        .status-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, var(--success), #059669);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 3rem;
-            margin-bottom: 3rem;
-        }
-
-        .control-panel {
-            background: var(--surface);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 2rem;
-            height: fit-content;
-            position: sticky;
-            top: 2rem;
-            transition: all 0.3s ease;
-        }
-
-        .control-panel:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow);
-            border-color: rgba(102, 126, 234, 0.3);
-        }
-
-        .panel-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 2rem;
-            text-align: center;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .form-group {
-            margin-bottom: 2rem;
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 0.75rem;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 1rem 1.25rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-            background: rgba(255, 255, 255, 0.08);
-        }
-
-        .form-input::placeholder {
-            color: var(--text-muted);
-        }
-
-        /* Quick Category Buttons */
-        .quick-categories {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .category-btn {
-            padding: 1rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .category-btn:hover {
-            background: var(--surface-hover);
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
-
-        .category-btn.active {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-color: var(--primary);
-            color: white;
-        }
-
-        .category-icon {
-            font-size: 1.5rem;
-            display: block;
-            margin-bottom: 0.5rem;
-        }
-
-        .category-name {
-            font-size: 0.9rem;
-        }
-
-        /* Range Sliders */
-        .range-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .range-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .range-value {
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .range-slider {
-            width: 100%;
-            height: 6px;
-            background: var(--bg-tertiary);
-            border-radius: 3px;
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        .range-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-        }
-
-        .range-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-        }
-
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 16px;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            position: relative;
-            overflow: hidden;
-            width: 100%;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
-        }
-
-        .btn-secondary {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            backdrop-filter: blur(10px);
-            margin-bottom: 1rem;
-        }
-
-        .btn-secondary:hover {
-            background: var(--surface-hover);
-            transform: translateY(-2px);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top: 2px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Results Section */
-        .results-section {
-            background: var(--surface);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 2rem;
-            min-height: 600px;
-        }
-
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .results-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        .results-stats {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
-        .arbitrage-grid {
-            display: grid;
-            gap: 2rem;
-        }
-
-        .arbitrage-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .arbitrage-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
-        }
-
-        .arbitrage-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow);
-            border-color: rgba(102, 126, 234, 0.3);
-        }
-
-        .arbitrage-card:hover::before {
-            transform: scaleX(1);
-        }
-
-        .arbitrage-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .arbitrage-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .arbitrage-meta {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .meta-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .risk-low { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-        .risk-medium { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-        .risk-high { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-
-        .buy-sell-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-        }
-
-        .listing-side {
-            padding: 1.5rem;
-        }
-
-        .buy-side {
-            border-right: 1px solid var(--border);
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        .sell-side {
-            background: rgba(102, 126, 234, 0.05);
-        }
-
-        .side-header {
-            font-size: 0.8rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-
-        .buy-header {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--success);
-        }
-
-        .sell-header {
-            background: rgba(102, 126, 234, 0.2);
-            color: var(--primary);
-        }
-
-        .listing-info {
-            margin-bottom: 1rem;
-        }
-
-        .listing-title {
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-            line-height: 1.3;
-        }
-
-        .listing-price {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .buy-price { color: var(--success); }
-        .sell-price { color: var(--primary); }
-
-        .listing-details {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
-        }
-
-        .listing-link {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            background: var(--primary);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .listing-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .profit-section {
-            padding: 1.5rem;
-            background: rgba(255, 255, 255, 0.02);
-            border-top: 1px solid var(--border);
-        }
-
-        .profit-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .profit-item {
-            text-align: center;
-        }
-
-        .profit-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .profit-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-
-        .profit-positive { color: var(--success); }
-        .profit-warning { color: var(--warning); }
-
-        .confidence-bar {
-            height: 8px;
-            background: var(--bg-tertiary);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(135deg, var(--success), var(--primary));
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-secondary);
-        }
-
-        .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .empty-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--text-primary);
-        }
-
-        .empty-text {
-            margin-bottom: 2rem;
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            max-width: 400px;
-            padding: 1rem 1.5rem;
-            border-radius: 16px;
-            color: white;
-            font-weight: 500;
-            box-shadow: var(--shadow);
-            z-index: 1000;
-            animation: slideInRight 0.3s ease-out;
-        }
-
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes slideOutRight {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-
-        .notification-success {
-            background: linear-gradient(135deg, var(--success), #059669);
-        }
-
-        .notification-error {
-            background: linear-gradient(135deg, var(--danger), #dc2626);
-        }
-
-        .notification-info {
-            background: linear-gradient(135deg, var(--accent), #0891b2);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-                gap: 2rem;
-            }
-            
-            .control-panel {
-                position: static;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 0 1rem;
-            }
-            
-            .logo {
-                font-size: 2.5rem;
-            }
-            
-            .buy-sell-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .buy-side {
-                border-right: none;
-                border-bottom: 1px solid var(--border);
-            }
-            
-            .profit-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .quick-categories {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1 class="logo">🦅 FlipHawk</h1>
-            <p class="tagline">Real-Time eBay Arbitrage Scanner</p>
-            <div class="status-badge">✅ Keywords Only - No Categories Required</div>
-        </header>
-
-        <!-- Main Content Grid -->
-        <div class="main-grid">
-            <!-- Control Panel -->
-            <div class="control-panel">
-                <h2 class="panel-title">🎯 Arbitrage Scanner</h2>
+        # Rotate user agents to avoid detection
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
+        ]
+        
+        self.session = requests.Session()
+        self.last_request_time = 0
+        self.min_delay = 1.0  # Minimum delay between requests
+        
+        # Track seen items to avoid duplicates
+        self.seen_items = set()
+    
+    def get_headers(self):
+        """Get randomized headers"""
+        return {
+            'User-Agent': random.choice(self.user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+        }
+    
+    def rate_limit(self):
+        """Implement rate limiting"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.min_delay:
+            sleep_time = self.min_delay - time_since_last + random.uniform(0.1, 0.5)
+            time.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
+    
+    def build_search_url(self, keyword: str, page: int = 1, sort_order: str = "price") -> str:
+        """Build eBay search URL"""
+        params = {
+            '_nkw': keyword,
+            '_pgn': page,
+            '_ipg': 240,  # Max items per page
+            'LH_BIN': 1,  # Buy It Now only
+            'LH_Complete': 0,  # Active listings only
+            'LH_Sold': 0,  # Not sold
+            'rt': 'nc',   # No category redirect
+            '_sacat': 0,  # All categories
+        }
+        
+        # Sort options
+        sort_mapping = {
+            'price': 15,    # Price + shipping: lowest first
+            'newest': 10,   # Time: newly listed
+            'ending': 1,    # Time: ending soonest
+            'popular': 12   # Best Match
+        }
+        
+        params['_sop'] = sort_mapping.get(sort_order, 15)
+        
+        query_string = urlencode(params)
+        return f"{self.search_url}?{query_string}"
+    
+    def get_page(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
+        """Fetch and parse eBay page"""
+        for attempt in range(retries):
+            try:
+                self.rate_limit()
                 
-                <form id="scanForm">
-                    <div class="form-group">
-                        <label class="form-label">🔍 Search Keywords</label>
-                        <input type="text" class="form-input" id="keywords" placeholder="e.g., airpods pro, nintendo switch, pokemon cards" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">🚀 Quick Fill (Optional)</label>
-                        <div class="quick-categories">
-                            <div class="category-btn" onclick="fillKeywords('gaming')">
-                                <span class="category-icon">🎮</span>
-                                <span class="category-name">Gaming</span>
-                            </div>
-                            <div class="category-btn" onclick="fillKeywords('tech')">
-                                <span class="category-icon">💻</span>
-                                <span class="category-name">Tech</span>
-                            </div>
-                            <div class="category-btn" onclick="fillKeywords('pokemon')">
-                                <span class="category-icon">🃏</span>
-                                <span class="category-name">Pokemon</span>
-                            </div>
-                            <div class="category-btn" onclick="fillKeywords('sneakers')">
-                                <span class="category-icon">👟</span>
-                                <span class="category-name">Sneakers</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="range-group">
-                            <div class="range-label">
-                                <span class="form-label">💰 Min Net Profit</span>
-                                <span class="range-value" id="minProfitValue">$15</span>
-                            </div>
-                            <input type="range" class="range-slider" id="minProfit" min="5" max="100" value="15" step="5">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="range-group">
-                            <div class="range-label">
-                                <span class="form-label">📊 Max Results</span>
-                                <span class="range-value" id="maxResultsValue">10</span>
-                            </div>
-                            <input type="range" class="range-slider" id="maxResults" min="5" max="25" value="10" step="5">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" id="scanBtn">
-                        <span id="scanText">🚀 Find Arbitrage</span>
-                        <div id="scanSpinner" class="spinner" style="display: none;"></div>
-                    </button>
-                </form>
-
-                <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
-                    <button class="btn btn-secondary" onclick="runQuickScan()">
-                        ⚡ Quick Scan (AirPods)
-                    </button>
-                    <button class="btn btn-secondary" onclick="runTrendingScan()">
-                        📈 Trending Scan (Switch)
-                    </button>
-                </div>
-            </div>
-
-            <!-- Results Section -->
-            <div class="results-section">
-                <div class="results-header">
-                    <h2 class="results-title">💎 Arbitrage Opportunities</h2>
-                    <div class="results-stats" id="resultsStats">
-                        <span>Ready to scan for real arbitrage</span>
-                    </div>
-                </div>
-
-                <div id="resultsContainer">
-                    <div class="empty-state">
-                        <div class="empty-icon">🎯</div>
-                        <h3 class="empty-title">Ready to Find Real Arbitrage</h3>
-                        <p class="empty-text">Type keywords in the search box (like "airpods pro" or "nintendo switch") or click a quick fill button, then hit "Find Arbitrage" to discover real price differences on eBay.</p>
-                        <button class="btn btn-primary" onclick="fillKeywords('airpods pro'); document.getElementById('scanForm').requestSubmit();">
-                            🚀 Try "AirPods Pro"
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Global state
-        let isScanning = false;
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            setupEventListeners();
-        });
-
-        function setupEventListeners() {
-            // Range sliders
-            document.getElementById('minProfit').addEventListener('input', function() {
-                document.getElementById('minProfitValue').textContent = `${this.value}`;
-            });
-            
-            document.getElementById('maxResults').addEventListener('input', function() {
-                document.getElementById('maxResultsValue').textContent = this.value;
-            });
-
-            // Form submission
-            document.getElementById('scanForm').addEventListener('submit', handleScan);
-            
-            // Enter key
-            document.getElementById('keywords').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !isScanning) {
-                    handleScan(e);
-                }
-            });
-        }
-
-        // Fill keywords function for category buttons
-        function fillKeywords(type) {
-            const keywordMap = {
-                'gaming': 'gaming',
-                'tech': 'tech',
-                'pokemon': 'pokemon',
-                'sneakers': 'sneakers'
-            };
-            
-            // Remove active class from all buttons
-            document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Add active class to clicked button
-            event.target.closest('.category-btn').classList.add('active');
-            
-            // Fill the input
-            document.getElementById('keywords').value = keywordMap[type] || type;
-            document.getElementById('keywords').focus();
-        }
-
-        async function handleScan(event) {
-            event.preventDefault();
-            
-            if (isScanning) return;
-            
-            const keywords = document.getElementById('keywords').value.trim();
-            
-            if (!keywords) {
-                showNotification('Please enter search keywords', 'error');
-                return;
-            }
-
-            const scanData = {
-                keywords: keywords,  // Simple - just send keywords
-                min_profit: parseFloat(document.getElementById('minProfit').value),
-                limit: parseInt(document.getElementById('maxResults').value)
-            };
-
-            await startScan(scanData);
-        }
-
-        async function runQuickScan() {
-            document.getElementById('keywords').value = 'airpods pro';
-            const scanData = {
-                keywords: 'airpods pro',
-                min_profit: 20.0,
-                limit: 10
-            };
-            await startScan(scanData);
-        }
-
-        async function runTrendingScan() {
-            document.getElementById('keywords').value = 'nintendo switch oled';
-            const scanData = {
-                keywords: 'nintendo switch oled',
-                min_profit: 25.0,
-                limit: 15
-            };
-            await startScan(scanData);
-        }
-
-        async function startScan(scanData) {
-            isScanning = true;
-            updateScanButton(true);
-            showNotification(`Scanning eBay for "${scanData.keywords}"...`, 'info');
-
-            try {
-                const response = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(scanData)
-                });
-
-                const result = await response.json();
-
-                if (result.status === 'success') {
-                    displayResults(result.data);
-                    const count = result.data.opportunities_summary?.total_opportunities || 0;
-                    showNotification(`Found ${count} real arbitrage opportunities!`, 'success');
-                } else {
-                    throw new Error(result.message || 'Scan failed');
-                }
-            } catch (error) {
-                console.error('Scan error:', error);
-                showNotification(`Scan failed: ${error.message}`, 'error');
-                displayError();
-            } finally {
-                isScanning = false;
-                updateScanButton(false);
-            }
-        }
-
-        function updateScanButton(scanning) {
-            const btn = document.getElementById('scanBtn');
-            const text = document.getElementById('scanText');
-            const spinner = document.getElementById('scanSpinner');
-            
-            if (scanning) {
-                text.style.display = 'none';
-                spinner.style.display = 'block';
-                btn.disabled = true;
-                btn.style.opacity = '0.8';
-            } else {
-                text.style.display = 'block';
-                spinner.style.display = 'none';
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            }
-        }
-
-        function displayResults(data) {
-            const container = document.getElementById('resultsContainer');
-            const stats = document.getElementById('resultsStats');
-            
-            // Update stats
-            const metadata = data.scan_metadata || {};
-            stats.innerHTML = `
-                <span>⏱️ ${metadata.duration_seconds || 0}s</span>
-                <span>🔍 ${metadata.total_listings_analyzed || 0} listings</span>
-                <span>💎 ${metadata.arbitrage_opportunities_found || 0} opportunities</span>
-            `;
-
-            // Display opportunities
-            const opportunities = data.top_opportunities || [];
-            if (opportunities.length > 0) {
-                container.innerHTML = `
-                    <div class="arbitrage-grid">
-                        ${opportunities.map(createArbitrageCard).join('')}
-                    </div>
-                `;
-            } else {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">😔</div>
-                        <h3 class="empty-title">No Arbitrage Found</h3>
-                        <p class="empty-text">Try different keywords or lower the minimum profit. Real arbitrage opportunities are rare but profitable!</p>
-                        <button class="btn btn-secondary" onclick="document.getElementById('minProfit').value=5; document.getElementById('minProfitValue').textContent='$5';">
-                            📉 Lower Profit to $5
-                        </button>
-                    </div>
-                `;
-            }
-        }
-
-        function createArbitrageCard(opportunity) {
-            const riskClass = `risk-${opportunity.risk_level?.toLowerCase() || 'low'}`;
-            const confidence = opportunity.confidence_score || 50;
-            
-            return `
-                <div class="arbitrage-card">
-                    <div class="arbitrage-header">
-                        <h3 class="arbitrage-title">${truncateTitle(opportunity.buy_listing?.title || 'Product', 80)}</h3>
-                        <div class="arbitrage-meta">
-                            <span class="meta-badge ${riskClass}">${opportunity.risk_level || 'LOW'} Risk</span>
-                            <span>Confidence: ${confidence}%</span>
-                            <span>Match: ${((opportunity.similarity_score || 0.8) * 100).toFixed(0)}%</span>
-                        </div>
-                    </div>
+                headers = self.get_headers()
+                response = self.session.get(url, headers=headers, timeout=15)
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    <div class="buy-sell-grid">
-                        <div class="listing-side buy-side">
-                            <div class="side-header buy-header">🛒 BUY LOW</div>
-                            <div class="listing-info">
-                                <div class="listing-title">${truncateTitle(opportunity.buy_listing?.title || '', 60)}</div>
-                                <div class="listing-price buy-price">${(opportunity.buy_listing?.total_cost || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="listing-details">
-                                <div>Price: ${(opportunity.buy_listing?.price || 0).toFixed(2)}</div>
-                                <div>Shipping: ${(opportunity.buy_listing?.shipping_cost || 0).toFixed(2)}</div>
-                                <div>Condition: ${opportunity.buy_listing?.condition || 'Unknown'}</div>
-                            </div>
-                            <a href="${opportunity.buy_listing?.ebay_link || '#'}" target="_blank" class="listing-link">
-                                🛒 View Buy Listing
-                            </a>
-                        </div>
-                        
-                        <div class="listing-side sell-side">
-                            <div class="side-header sell-header">💰 SELL HIGH</div>
-                            <div class="listing-info">
-                                <div class="listing-title">${truncateTitle(opportunity.sell_reference?.title || '', 60)}</div>
-                                <div class="listing-price sell-price">${(opportunity.sell_reference?.price || 0).toFixed(2)}</div>
-                            </div>
-                            <div class="listing-details">
-                                <div>Price: ${(opportunity.sell_reference?.price || 0).toFixed(2)}</div>
-                                <div>Shipping: ${(opportunity.sell_reference?.shipping_cost || 0).toFixed(2)}</div>
-                                <div>Condition: ${opportunity.sell_reference?.condition || 'Unknown'}</div>
-                            </div>
-                            <a href="${opportunity.sell_reference?.ebay_link || '#'}" target="_blank" class="listing-link">
-                                📊 View Sell Reference
-                            </a>
-                        </div>
-                    </div>
+                    # Verify it's a valid eBay page
+                    if soup.find('title') and 'eBay' in soup.get_text():
+                        return soup
+                    else:
+                        logger.warning(f"Invalid eBay page content")
+                        return None
+                
+                elif response.status_code == 429:
+                    wait_time = (2 ** attempt) + random.uniform(5, 15)
+                    logger.warning(f"Rate limited, waiting {wait_time:.1f}s...")
+                    time.sleep(wait_time)
                     
-                    <div class="profit-section">
-                        <div class="profit-grid">
-                            <div class="profit-item">
-                                <div class="profit-value profit-positive">${(opportunity.gross_profit || 0).toFixed(2)}</div>
-                                <div class="profit-label">Gross Profit</div>
-                            </div>
-                            <div class="profit-item">
-                                <div class="profit-value profit-positive">${(opportunity.net_profit_after_fees || 0).toFixed(2)}</div>
-                                <div class="profit-label">Net Profit</div>
-                            </div>
-                            <div class="profit-item">
-                                <div class="profit-value ${(opportunity.roi_percentage || 0) >= 50 ? 'profit-positive' : 'profit-warning'}">${(opportunity.roi_percentage || 0).toFixed(1)}%</div>
-                                <div class="profit-label">ROI</div>
-                            </div>
-                            <div class="profit-item">
-                                <div class="profit-value profit-warning">${(opportunity.estimated_fees || 0).toFixed(2)}</div>
-                                <div class="profit-label">Est. Fees</div>
-                            </div>
-                        </div>
+                else:
+                    logger.warning(f"HTTP {response.status_code} for {url}")
+                    if attempt < retries - 1:
+                        time.sleep(random.uniform(2, 5))
                         
-                        <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${Math.max(confidence, 10)}%"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function truncateTitle(title, maxLength = 60) {
-            if (!title) return 'No Title';
-            return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
-        }
-
-        function displayError() {
-            const container = document.getElementById('resultsContainer');
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">⚠️</div>
-                    <h3 class="empty-title">Scan Failed</h3>
-                    <p class="empty-text">There was an error. This could be network issues or eBay blocking requests. Try different keywords.</p>
-                    <button class="btn btn-primary" onclick="runQuickScan();">
-                        🔄 Try Quick Scan
-                    </button>
-                </div>
-            `;
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.textContent = message;
+            except Exception as e:
+                logger.error(f"Error fetching page (attempt {attempt + 1}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(random.uniform(3, 8))
+        
+        return None
+    
+    def extract_listing_data(self, item_soup: BeautifulSoup, keyword: str) -> Optional[eBayListing]:
+        """Extract real listing data from eBay HTML"""
+        try:
+            # Extract title
+            title_selectors = [
+                'h3.s-item__title span[role="heading"]',
+                'h3.s-item__title',
+                '.s-item__title span',
+                '.s-item__title'
+            ]
             
-            document.body.appendChild(notification);
+            title = None
+            for selector in title_selectors:
+                title_elem = item_soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    break
             
-            setTimeout(() => {
-                notification.style.animation = 'slideOutRight 0.3s ease-in';
-                setTimeout(() => {
-                    if (document.body.contains(notification)) {
-                        document.body.removeChild(notification);
+            if not title or len(title) < 10:
+                return None
+            
+            # Skip promotional content
+            skip_patterns = [
+                'shop on ebay', 'sponsored', 'advertisement', 'see more like this',
+                'you may also like', 'trending at', 'shop with confidence'
+            ]
+            
+            if any(pattern in title.lower() for pattern in skip_patterns):
+                return None
+            
+            # Extract price
+            price = 0.0
+            price_selectors = [
+                '.s-item__price .notranslate',
+                '.s-item__price span.POSITIVE',
+                '.s-item__price'
+            ]
+            
+            for selector in price_selectors:
+                price_elem = item_soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    
+                    # Handle price ranges
+                    if 'to' in price_text.lower() or ' - ' in price_text:
+                        prices = re.findall(r'\$?([\d,]+\.?\d*)', price_text)
+                        if prices:
+                            try:
+                                price = float(prices[0].replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
+                    else:
+                        price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text)
+                        if price_match:
+                            try:
+                                price = float(price_match.group(1).replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
+            
+            if price <= 0 or price > 50000:
+                return None
+            
+            # Extract shipping cost
+            shipping_cost = 0.0
+            shipping_selectors = [
+                '.s-item__shipping .vi-price .notranslate',
+                '.s-item__shipping'
+            ]
+            
+            for selector in shipping_selectors:
+                shipping_elem = item_soup.select_one(selector)
+                if shipping_elem:
+                    shipping_text = shipping_elem.get_text(strip=True).lower()
+                    
+                    if 'free' in shipping_text:
+                        shipping_cost = 0.0
+                        break
+                    elif '$' in shipping_text:
+                        shipping_match = re.search(r'\$?([\d,]+\.?\d*)', shipping_text)
+                        if shipping_match:
+                            try:
+                                shipping_cost = float(shipping_match.group(1).replace(',', ''))
+                                shipping_cost = min(shipping_cost, price * 0.5)  # Cap shipping
+                                break
+                            except ValueError:
+                                continue
+            
+            total_cost = price + shipping_cost
+            
+            # Extract eBay link
+            ebay_link = ""
+            link_selectors = [
+                'a.s-item__link',
+                '.s-item__title a',
+                'h3.s-item__title a'
+            ]
+            
+            for selector in link_selectors:
+                link_elem = item_soup.select_one(selector)
+                if link_elem:
+                    href = link_elem.get('href', '')
+                    if href:
+                        if href.startswith('//'):
+                            ebay_link = 'https:' + href
+                        elif href.startswith('/'):
+                            ebay_link = 'https://www.ebay.com' + href
+                        elif href.startswith('http'):
+                            ebay_link = href
+                        
+                        # Clean URL
+                        if '?' in ebay_link:
+                            ebay_link = ebay_link.split('?')[0]
+                        
+                        if 'ebay.com' in ebay_link:
+                            break
+            
+            if not ebay_link:
+                return None
+            
+            # Extract item ID
+            item_id = None
+            item_id_patterns = [
+                r'/itm/([^/]+/)?(\d{12,})',
+                r'/(\d{12,})',
+                r'item/(\d{12,})'
+            ]
+            
+            for pattern in item_id_patterns:
+                match = re.search(pattern, ebay_link)
+                if match:
+                    groups = match.groups()
+                    item_id = groups[-1] if groups else None
+                    if item_id and item_id.isdigit() and len(item_id) >= 12:
+                        break
+            
+            if not item_id:
+                import hashlib
+                item_id = str(abs(hash(ebay_link + title)))[:12]
+            
+            # Check for duplicates
+            if item_id in self.seen_items:
+                return None
+            self.seen_items.add(item_id)
+            
+            # Extract condition
+            condition = "Unknown"
+            condition_selectors = [
+                '.SECONDARY_INFO',
+                '.s-item__subtitle',
+                '.s-item__condition'
+            ]
+            
+            for selector in condition_selectors:
+                condition_elem = item_soup.select_one(selector)
+                if condition_elem:
+                    condition_text = condition_elem.get_text(strip=True)
+                    
+                    condition_keywords = [
+                        'brand new', 'new', 'new with tags', 'sealed',
+                        'open box', 'like new', 'excellent', 'very good', 'good',
+                        'acceptable', 'used', 'pre-owned', 'refurbished'
+                    ]
+                    
+                    condition_lower = condition_text.lower()
+                    for keyword_cond in condition_keywords:
+                        if keyword_cond in condition_lower:
+                            condition = condition_text
+                            break
+                    
+                    if condition != "Unknown":
+                        break
+            
+            # Extract seller info
+            seller_username = "Unknown"
+            seller_rating = "Not available"
+            seller_feedback = "Not available"
+            
+            seller_selectors = [
+                '.s-item__seller-info-text',
+                '.s-item__seller-info'
+            ]
+            
+            for selector in seller_selectors:
+                seller_elem = item_soup.select_one(selector)
+                if seller_elem:
+                    seller_text = seller_elem.get_text(strip=True)
+                    
+                    # Extract rating
+                    rating_match = re.search(r'([\d.]+)%\s*positive', seller_text.lower())
+                    if rating_match:
+                        seller_rating = f"{rating_match.group(1)}%"
+                    
+                    # Extract feedback count
+                    feedback_patterns = [
+                        r'\((\d{1,3}(?:,\d{3})*)\)',
+                        r'(\d{1,3}(?:,\d{3})*)\s*feedback'
+                    ]
+                    
+                    for pattern in feedback_patterns:
+                        count_match = re.search(pattern, seller_text)
+                        if count_match:
+                            seller_feedback = count_match.group(1)
+                            break
+                    
+                    if seller_rating != "Not available":
+                        break
+            
+            # Extract image URL
+            image_url = ""
+            image_selectors = [
+                '.s-item__image img',
+                '.s-item__wrapper img'
+            ]
+            
+            for selector in image_selectors:
+                img_elem = item_soup.select_one(selector)
+                if img_elem:
+                    src = img_elem.get('src') or img_elem.get('data-src')
+                    if src:
+                        if 's-l' in src:
+                            src = re.sub(r's-l\d+', 's-l500', src)
+                        
+                        if src.startswith('//'):
+                            image_url = 'https:' + src
+                        elif src.startswith('/'):
+                            image_url = 'https://www.ebay.com' + src
+                        else:
+                            image_url = src
+                        break
+            
+            # Extract location
+            location = "Unknown"
+            location_selectors = [
+                '.s-item__location',
+                '.s-item__itemLocation'
+            ]
+            
+            for selector in location_selectors:
+                location_elem = item_soup.select_one(selector)
+                if location_elem:
+                    location_text = location_elem.get_text(strip=True)
+                    if location_text:
+                        location = location_text.replace('From', '').replace('from', '').strip()
+                    break
+            
+            # Additional info
+            is_auction = bool(item_soup.select_one('.s-item__time-left, .timeMs'))
+            watchers = "Not available"
+            bids = "0" if not is_auction else "Unknown"
+            time_left = "Buy It Now" if not is_auction else "Unknown"
+            
+            return eBayListing(
+                item_id=item_id,
+                title=title,
+                price=price,
+                shipping_cost=shipping_cost,
+                total_cost=total_cost,
+                condition=condition,
+                seller_username=seller_username,
+                seller_rating=seller_rating,
+                seller_feedback=seller_feedback,
+                image_url=image_url,
+                ebay_link=ebay_link,
+                location=location,
+                listing_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                watchers=watchers,
+                bids=bids,
+                time_left=time_left,
+                is_auction=is_auction,
+                buy_it_now_available=not is_auction
+            )
+            
+        except Exception as e:
+            logger.error(f"Error extracting listing data: {e}")
+            return None
+    
+    def search_ebay(self, keyword: str, limit: int = 50, sort_order: str = "price", 
+                   max_pages: int = 3) -> List[eBayListing]:
+        """Search eBay for real listings"""
+        logger.info(f"🔍 Searching eBay for: '{keyword}' (limit: {limit})")
+        
+        all_listings = []
+        
+        for page in range(1, max_pages + 1):
+            try:
+                url = self.build_search_url(keyword, page, sort_order)
+                soup = self.get_page(url)
+                
+                if not soup:
+                    logger.warning(f"Failed to get page {page} for '{keyword}'")
+                    break
+                
+                # Find item containers
+                items = soup.select('.s-item__wrapper, .s-item')
+                
+                if not items:
+                    logger.warning(f"No items found on page {page}")
+                    break
+                
+                logger.info(f"Found {len(items)} items on page {page}")
+                
+                page_listings = []
+                for item in items:
+                    listing = self.extract_listing_data(item, keyword)
+                    if listing:
+                        page_listings.append(listing)
+                
+                all_listings.extend(page_listings)
+                logger.info(f"Extracted {len(page_listings)} valid listings from page {page}")
+                
+                # Stop if we have enough listings
+                if len(all_listings) >= limit:
+                    break
+                
+                # Rate limiting between pages
+                time.sleep(random.uniform(2.0, 4.0))
+                
+            except Exception as e:
+                logger.error(f"Error searching page {page}: {e}")
+                continue
+        
+        # Sort by price if requested
+        if sort_order == "price":
+            all_listings.sort(key=lambda x: x.total_cost)
+        
+        logger.info(f"✅ Search completed: {len(all_listings)} real listings found")
+        return all_listings[:limit]
+    
+    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
+        """Find arbitrage opportunities by comparing similar listings"""
+        logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
+        
+        opportunities = []
+        
+        # Group similar products
+        from difflib import SequenceMatcher
+        
+        for i, buy_listing in enumerate(listings[:-1]):
+            for sell_listing in listings[i+1:]:
+                
+                # Calculate title similarity
+                similarity = SequenceMatcher(None, 
+                                           buy_listing.title.lower(), 
+                                           sell_listing.title.lower()).ratio()
+                
+                # Must be similar enough (same product)
+                if similarity < 0.6:
+                    continue
+                
+                # Must have meaningful price difference
+                price_diff = sell_listing.total_cost - buy_listing.total_cost
+                if price_diff < min_profit:
+                    continue
+                
+                # Calculate fees and net profit
+                gross_profit = sell_listing.price - buy_listing.total_cost
+                ebay_fees = sell_listing.price * 0.129  # ~12.9% eBay final value fee
+                paypal_fees = sell_listing.price * 0.0349 + 0.49  # PayPal fees
+                shipping_cost = 8.0 if sell_listing.shipping_cost == 0 else 0
+                
+                total_fees = ebay_fees + paypal_fees + shipping_cost
+                net_profit = gross_profit - total_fees
+                
+                if net_profit >= min_profit:
+                    roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
+                    
+                    # Calculate confidence
+                    confidence = 40
+                    if similarity > 0.8:
+                        confidence += 30
+                    elif similarity > 0.7:
+                        confidence += 20
+                    elif similarity > 0.6:
+                        confidence += 10
+                    
+                    if net_profit >= 30:
+                        confidence += 20
+                    elif net_profit >= 20:
+                        confidence += 15
+                    elif net_profit >= 15:
+                        confidence += 10
+                    
+                    if 'new' in buy_listing.condition.lower():
+                        confidence += 10
+                    
+                    opportunity = {
+                        'opportunity_id': f"REAL_{int(time.time())}_{random.randint(1000, 9999)}",
+                        'buy_listing': asdict(buy_listing),
+                        'sell_reference': asdict(sell_listing),
+                        'similarity_score': round(similarity, 3),
+                        'confidence_score': min(95, confidence),
+                        'risk_level': 'LOW' if roi < 50 else 'MEDIUM' if roi < 100 else 'HIGH',
+                        'gross_profit': round(gross_profit, 2),
+                        'net_profit_after_fees': round(net_profit, 2),
+                        'roi_percentage': round(roi, 1),
+                        'estimated_fees': round(total_fees, 2),
+                        'profit_analysis': {
+                            'gross_profit': gross_profit,
+                            'net_profit_after_fees': net_profit,
+                            'roi_percentage': roi,
+                            'estimated_fees': total_fees,
+                            'fee_breakdown': {
+                                'ebay_fee': ebay_fees,
+                                'payment_fee': paypal_fees,
+                                'shipping_cost': shipping_cost
+                            }
+                        },
+                        'created_at': datetime.now().isoformat()
                     }
-                }, 300);
-            }, 4000);
+                    
+                    opportunities.append(opportunity)
+        
+        # Sort by profitability
+        opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
+        
+        logger.info(f"✅ Found {len(opportunities)} real arbitrage opportunities")
+        return opportunities[:20]  # Return top 20
+
+# Global scraper instance
+scraper = RealTimeeBayScraper()
+
+def search_ebay_real(keyword: str, limit: int = 50, sort: str = "price") -> List[Dict]:
+    """Main function to search eBay for real listings"""
+    try:
+        listings = scraper.search_ebay(keyword, limit, sort)
+        return [asdict(listing) for listing in listings]
+    except Exception as e:
+        logger.error(f"Real eBay search failed: {e}")
+        return []
+
+def find_arbitrage_real(keyword: str, min_profit: float = 15.0, limit: int = 50) -> Dict:
+    """Find real arbitrage opportunities"""
+    try:
+        start_time = datetime.now()
+        
+        # Get real listings
+        listings = scraper.search_ebay(keyword, limit, "price")
+        
+        # Find arbitrage opportunities
+        opportunities = scraper.find_arbitrage_opportunities(listings, min_profit)
+        
+        # Calculate summary
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        total_opportunities = len(opportunities)
+        avg_profit = sum(opp['net_profit_after_fees'] for opp in opportunities) / max(total_opportunities, 1)
+        highest_profit = max([opp['net_profit_after_fees'] for opp in opportunities], default=0)
+        avg_roi = sum(opp['roi_percentage'] for opp in opportunities) / max(total_opportunities, 1)
+        
+        return {
+            'scan_metadata': {
+                'scan_id': f"REAL_{int(time.time())}",
+                'timestamp': end_time.isoformat(),
+                'duration_seconds': round(duration, 2),
+                'total_searches_performed': 1,
+                'total_listings_analyzed': len(listings),
+                'arbitrage_opportunities_found': total_opportunities,
+                'scan_efficiency': round((total_opportunities / max(len(listings), 1)) * 100, 2),
+                'keywords_used': [keyword],
+                'unique_products_found': len(listings)
+            },
+            'opportunities_summary': {
+                'total_opportunities': total_opportunities,
+                'average_profit_after_fees': round(avg_profit, 2),
+                'average_roi': round(avg_roi, 1),
+                'highest_profit': round(highest_profit, 2),
+                'risk_distribution': {
+                    'low': len([opp for opp in opportunities if opp['risk_level'] == 'LOW']),
+                    'medium': len([opp for opp in opportunities if opp['risk_level'] == 'MEDIUM']),
+                    'high': len([opp for opp in opportunities if opp['risk_level'] == 'HIGH'])
+                }
+            },
+            'top_opportunities': opportunities
         }
-    </script>
-</body>
-</html>
+        
+    except Exception as e:
+        logger.error(f"Arbitrage analysis failed: {e}")
+        return {
+            'scan_metadata': {'error': str(e)},
+            'opportunities_summary': {'total_opportunities': 0},
+            'top_opportunities': []
+        }
+
+# Demo function
+def demo_real_scraper():
+    """Demo the real scraper"""
+    print("🚀 FlipHawk Real-Time eBay Scraper Demo")
+    print("=" * 50)
+    print("⚠️  This scrapes REAL eBay data - NO DUMMY DATA")
+    print()
+    
+    test_keyword = "airpods pro"
+    
+    print(f"🔍 Searching for: '{test_keyword}'")
+    results = find_arbitrage_real(test_keyword, min_profit=10.0, limit=20)
+    
+    print(f"\n📊 REAL RESULTS:")
+    print(f"⏱️  Duration: {results['scan_metadata']['duration_seconds']} seconds")
+    print(f"🔍 Listings analyzed: {results['scan_metadata']['total_listings_analyzed']}")
+    print(f"💎 Arbitrage opportunities: {results['opportunities_summary']['total_opportunities']}")
+    
+    if results['top_opportunities']:
+        print(f"\n🏆 TOP ARBITRAGE OPPORTUNITIES:")
+        for i, opp in enumerate(results['top_opportunities'][:3], 1):
+            buy = opp['buy_listing']
+            sell = opp['sell_reference']
+            
+            print(f"\n{i}. OPPORTUNITY #{opp['opportunity_id']}")
+            print(f"   🛒 Buy: {buy['title'][:60]}...")
+            print(f"   💰 Buy Price: ${buy['total_cost']:.2f}")
+            print(f"   💸 Sell Reference: ${sell['price']:.2f}")
+            print(f"   💵 Net Profit: ${opp['net_profit_after_fees']:.2f}")
+            print(f"   📈 ROI: {opp['roi_percentage']:.1f}%")
+            print(f"   🎯 Confidence: {opp['confidence_score']}%")
+            print(f"   🔗 Buy Link: {buy['ebay_link']}")
+    else:
+        print("\n❌ No arbitrage opportunities found")
+        print("💡 Try different keywords or lower the minimum profit")
+    
+    print("\n" + "=" * 50)
+    print("✅ Real demo completed!")
+
+if __name__ == "__main__":
+    demo_real_scraper()
