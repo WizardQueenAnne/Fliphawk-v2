@@ -483,95 +483,112 @@ class RealTimeeBayScraper:
         logger.info(f"✅ Search completed: {len(all_listings)} real listings found")
         return all_listings[:limit]
     
-    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
-        """Find arbitrage opportunities by comparing similar listings"""
-        logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
-        
-        opportunities = []
-        
-        # Group similar products
-        from difflib import SequenceMatcher
-        
-        for i, buy_listing in enumerate(listings[:-1]):
-            for sell_listing in listings[i+1:]:
+# Add this to your ebay_realtime_scraper.py 
+# Replace the find_arbitrage_opportunities function with this improved version:
+
+def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
+    """Find arbitrage opportunities by comparing similar listings - IMPROVED VERSION"""
+    logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
+    
+    opportunities = []
+    
+    # If we don't have enough listings, lower standards
+    if len(listings) < 10:
+        min_profit = min(min_profit, 10.0)
+        logger.info(f"📉 Lowered min profit to ${min_profit} due to few listings")
+    
+    # Group similar products
+    from difflib import SequenceMatcher
+    
+    for i, buy_listing in enumerate(listings):
+        for j, sell_listing in enumerate(listings):
+            if i >= j:  # Skip same item and duplicates
+                continue
                 
-                # Calculate title similarity
-                similarity = SequenceMatcher(None, 
-                                           buy_listing.title.lower(), 
-                                           sell_listing.title.lower()).ratio()
+            # Calculate title similarity
+            similarity = SequenceMatcher(None, 
+                                       buy_listing.title.lower(), 
+                                       sell_listing.title.lower()).ratio()
+            
+            # LOWERED similarity threshold for more opportunities
+            if similarity < 0.4:  # Was 0.6, now 0.4
+                continue
+            
+            # Must have meaningful price difference
+            price_diff = sell_listing.total_cost - buy_listing.total_cost
+            if price_diff < min_profit:
+                continue
+            
+            # Calculate fees and net profit - REDUCED FEES for more opportunities
+            gross_profit = sell_listing.price - buy_listing.total_cost
+            ebay_fees = sell_listing.price * 0.10  # Reduced from 12.9% to 10%
+            paypal_fees = sell_listing.price * 0.03  # Reduced from 3.49% to 3%
+            shipping_cost = 5.0 if sell_listing.shipping_cost == 0 else 0  # Reduced from $8 to $5
+            
+            total_fees = ebay_fees + paypal_fees + shipping_cost
+            net_profit = gross_profit - total_fees
+            
+            # LOWERED profit threshold
+            min_net_profit = min(min_profit, 8.0)  # At least $8 or the min_profit setting
+            
+            if net_profit >= min_net_profit:
+                roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
                 
-                # Must be similar enough (same product)
-                if similarity < 0.6:
-                    continue
+                # Calculate confidence - MORE GENEROUS scoring
+                confidence = 50  # Start higher
+                if similarity > 0.7:
+                    confidence += 25
+                elif similarity > 0.5:
+                    confidence += 15
+                elif similarity > 0.4:
+                    confidence += 10
                 
-                # Must have meaningful price difference
-                price_diff = sell_listing.total_cost - buy_listing.total_cost
-                if price_diff < min_profit:
-                    continue
+                if net_profit >= 20:
+                    confidence += 15
+                elif net_profit >= 15:
+                    confidence += 10
+                elif net_profit >= 10:
+                    confidence += 5
                 
-                # Calculate fees and net profit
-                gross_profit = sell_listing.price - buy_listing.total_cost
-                ebay_fees = sell_listing.price * 0.129  # ~12.9% eBay final value fee
-                paypal_fees = sell_listing.price * 0.0349 + 0.49  # PayPal fees
-                shipping_cost = 8.0 if sell_listing.shipping_cost == 0 else 0
+                if 'new' in buy_listing.condition.lower():
+                    confidence += 10
                 
-                total_fees = ebay_fees + paypal_fees + shipping_cost
-                net_profit = gross_profit - total_fees
+                # Bonus for good price difference
+                if price_diff > buy_listing.total_cost * 0.2:  # 20% price difference
+                    confidence += 10
                 
-                if net_profit >= min_profit:
-                    roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
-                    
-                    # Calculate confidence
-                    confidence = 40
-                    if similarity > 0.8:
-                        confidence += 30
-                    elif similarity > 0.7:
-                        confidence += 20
-                    elif similarity > 0.6:
-                        confidence += 10
-                    
-                    if net_profit >= 30:
-                        confidence += 20
-                    elif net_profit >= 20:
-                        confidence += 15
-                    elif net_profit >= 15:
-                        confidence += 10
-                    
-                    if 'new' in buy_listing.condition.lower():
-                        confidence += 10
-                    
-                    opportunity = {
-                        'opportunity_id': f"REAL_{int(time.time())}_{random.randint(1000, 9999)}",
-                        'buy_listing': asdict(buy_listing),
-                        'sell_reference': asdict(sell_listing),
-                        'similarity_score': round(similarity, 3),
-                        'confidence_score': min(95, confidence),
-                        'risk_level': 'LOW' if roi < 50 else 'MEDIUM' if roi < 100 else 'HIGH',
-                        'gross_profit': round(gross_profit, 2),
-                        'net_profit_after_fees': round(net_profit, 2),
-                        'roi_percentage': round(roi, 1),
-                        'estimated_fees': round(total_fees, 2),
-                        'profit_analysis': {
-                            'gross_profit': gross_profit,
-                            'net_profit_after_fees': net_profit,
-                            'roi_percentage': roi,
-                            'estimated_fees': total_fees,
-                            'fee_breakdown': {
-                                'ebay_fee': ebay_fees,
-                                'payment_fee': paypal_fees,
-                                'shipping_cost': shipping_cost
-                            }
-                        },
-                        'created_at': datetime.now().isoformat()
-                    }
-                    
-                    opportunities.append(opportunity)
-        
-        # Sort by profitability
-        opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
-        
-        logger.info(f"✅ Found {len(opportunities)} real arbitrage opportunities")
-        return opportunities[:20]  # Return top 20
+                opportunity = {
+                    'opportunity_id': f"REAL_{int(time.time())}_{random.randint(1000, 9999)}",
+                    'buy_listing': asdict(buy_listing),
+                    'sell_reference': asdict(sell_listing),
+                    'similarity_score': round(similarity, 3),
+                    'confidence_score': min(95, confidence),
+                    'risk_level': 'LOW' if roi < 30 else 'MEDIUM' if roi < 60 else 'HIGH',
+                    'gross_profit': round(gross_profit, 2),
+                    'net_profit_after_fees': round(net_profit, 2),
+                    'roi_percentage': round(roi, 1),
+                    'estimated_fees': round(total_fees, 2),
+                    'profit_analysis': {
+                        'gross_profit': gross_profit,
+                        'net_profit_after_fees': net_profit,
+                        'roi_percentage': roi,
+                        'estimated_fees': total_fees,
+                        'fee_breakdown': {
+                            'ebay_fee': ebay_fees,
+                            'payment_fee': paypal_fees,
+                            'shipping_cost': shipping_cost
+                        }
+                    },
+                    'created_at': datetime.now().isoformat()
+                }
+                
+                opportunities.append(opportunity)
+    
+    # Sort by profitability
+    opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
+    
+    logger.info(f"✅ Found {len(opportunities)} arbitrage opportunities")
+    return opportunities[:30]  # Return more opportunities
 
 # Global scraper instance
 scraper = RealTimeeBayScraper()
