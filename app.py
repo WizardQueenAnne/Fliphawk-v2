@@ -13,6 +13,76 @@ import time
 from datetime import datetime
 import uuid
 
+#!/usr/bin/env python3
+"""
+Add this to the top of your app.py after the imports to debug eBay API detection
+"""
+
+import logging
+import sys
+
+# Set up logging to see what's happening
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Debug eBay API import
+print("🔍 DEBUGGING EBAY API IMPORT...")
+print("=" * 50)
+
+try:
+    print("📦 Step 1: Importing ebay_scraper...")
+    from ebay_scraper import search_ebay, api_client
+    print("✅ Successfully imported ebay_scraper module")
+    
+    print("📦 Step 2: Testing eBay API connection...")
+    # Test if we can get a token
+    token = api_client.get_access_token()
+    if token:
+        print(f"✅ Got eBay token: {token[:20]}...")
+        EBAY_API_AVAILABLE = True
+        print("🎉 eBay Browse API is AVAILABLE and WORKING!")
+    else:
+        print("❌ Failed to get eBay token")
+        EBAY_API_AVAILABLE = False
+        print("⚠️ Using demo mode")
+        
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    EBAY_API_AVAILABLE = False
+    print("⚠️ ebay_scraper module not found - using demo mode")
+    
+    # Create dummy functions for demo mode
+    def search_ebay(*args, **kwargs):
+        return []
+    
+    class DummyAPI:
+        def get_access_token(self):
+            return None
+    
+    api_client = DummyAPI()
+    
+except Exception as e:
+    print(f"❌ eBay API error: {e}")
+    EBAY_API_AVAILABLE = False
+    print("⚠️ eBay API failed - using demo mode")
+    
+    # Create dummy functions for demo mode
+    def search_ebay(*args, **kwargs):
+        return []
+    
+    class DummyAPI:
+        def get_access_token(self):
+            return None
+    
+    api_client = DummyAPI()
+
+print(f"🏁 FINAL STATUS: EBAY_API_AVAILABLE = {EBAY_API_AVAILABLE}")
+print("=" * 50)
+
+# Continue with your Flask app code below this...
+from flask import Flask, render_template, request, jsonify
+# ... rest of your app code
+
 # Set up detailed logging
 logging.basicConfig(
     level=logging.INFO,
