@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FlipHawk Flask App - PRODUCTION VERSION
-NO DUMMY DATA - ONLY REAL EBAY LISTINGS
+FlipHawk Flask App - REAL-TIME SCRAPING VERSION
+Uses web scraping for REAL eBay data - NO API needed, NO dummy data
 """
 
 from flask import Flask, render_template, request, jsonify
@@ -10,36 +10,24 @@ import os
 import logging
 import time
 from datetime import datetime
-import uuid
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import eBay API - NO FALLBACK TO DUMMY DATA
-print("🔍 Loading PRODUCTION eBay API...")
+# Import our real-time scraper
 try:
-    from ebay_scraper import search_ebay, get_categories, ebay_api
-    print("✅ PRODUCTION eBay API loaded successfully")
-    
-    # Test the connection immediately
-    print("🔑 Testing eBay API connection...")
-    token = ebay_api.get_access_token()
-    if token:
-        print(f"✅ eBay API connected! Token: {token[:20]}...")
-        EBAY_API_WORKING = True
-    else:
-        print("❌ eBay API failed to get token")
-        EBAY_API_WORKING = False
-        
+    from ebay_realtime_scraper import search_ebay_real, find_arbitrage_real, scraper
+    print("✅ Real-time eBay scraper loaded successfully")
+    SCRAPER_AVAILABLE = True
 except Exception as e:
-    print(f"❌ FATAL ERROR: Could not load eBay API: {e}")
-    print("💡 Make sure ebay_scraper.py is properly updated with PRODUCTION code")
-    exit(1)  # Exit if eBay API doesn't work
+    print(f"❌ Failed to load scraper: {e}")
+    SCRAPER_AVAILABLE = False
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'fliphawk-secret-key-2025')
+app.secret_key = os.environ.get('SECRET_KEY', 'fliphawk-realtime-key-2025')
 
 # Enable CORS
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -48,7 +36,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route('/')
 def index():
-    """Main landing page"""
+    """Main arbitrage scanner page"""
     return render_template('index.html')
 
 @app.route('/search')
@@ -64,159 +52,263 @@ def health_check():
     return jsonify({
         'status': 'success',
         'data': {
-            'server': 'FlipHawk PRODUCTION v2.0',
-            'ebay_api_working': EBAY_API_WORKING,
+            'server': 'FlipHawk Real-Time Scraper v1.0',
+            'scraper_available': SCRAPER_AVAILABLE,
             'uptime': str(datetime.now()),
-            'mode': 'PRODUCTION - REAL eBay DATA ONLY'
+            'mode': 'REAL-TIME WEB SCRAPING',
+            'no_dummy_data': True
         },
-        'message': 'FlipHawk server running with REAL eBay data'
+        'message': 'FlipHawk server running with real-time eBay scraping'
     })
 
-@app.route('/api/categories', methods=['GET'])
-def get_categories_endpoint():
-    """Get available categories"""
-    try:
-        category_data = get_categories()
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                **category_data,
-                'ebay_api_working': EBAY_API_WORKING,
-                'total_categories': len(category_data['categories'])
-            },
-            'message': 'Categories retrieved successfully'
-        })
-    except Exception as e:
-        logger.error(f"Error getting categories: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': 'Failed to retrieve categories',
-            'data': None
-        }), 500
-
 @app.route('/api/scan', methods=['POST'])
-def scan_ebay_listings():
-    """Main eBay scanning endpoint - REAL DATA ONLY"""
+def scan_arbitrage():
+    """Main arbitrage scanning endpoint - REAL eBay data only"""
     try:
-        if not EBAY_API_WORKING:
+        if not SCRAPER_AVAILABLE:
             return jsonify({
                 'status': 'error',
-                'message': 'eBay API is not working. Check your credentials.',
+                'message': 'Real-time scraper is not available',
                 'data': None
             }), 503
         
         request_data = request.get_json() or {}
         
         keyword = request_data.get('keyword', '').strip()
-        category = request_data.get('category')
-        subcategory = request_data.get('subcategory')
-        limit = min(int(request_data.get('limit', 20)), 30)  # Limit for production
-        sort_order = request_data.get('sort', 'price')
+        keywords = request_data.get('keywords', '').strip()
         
-        if not keyword and not (category and subcategory):
+        # Use either keyword or keywords
+        search_term = keyword or keywords
+        
+        if not search_term:
             return jsonify({
                 'status': 'error',
-                'message': 'Either keyword or category/subcategory is required',
-                'errors': ['Search requires either keywords or category selection']
+                'message': 'Search keyword is required',
+                'errors': ['Please provide a keyword to search for']
             }), 400
         
-        logger.info(f"🔍 PRODUCTION eBay search: '{keyword}' (category: {category}/{subcategory})")
+        limit = min(int(request_data.get('limit', 20)), 50)  # Cap at 50 for performance
+        min_profit = float(request_data.get('min_profit', 15.0))
+        
+        logger.info(f"🔍 Real-time arbitrage scan: '{search_term}' (min profit: ${min_profit})")
         
         # Record scan start time
         scan_start = datetime.now()
         
-        # Search REAL eBay - NO DUMMY DATA
-        listings = search_ebay(
-            keyword=keyword,
-            category=category,
-            subcategory=subcategory,
-            limit=limit,
-            sort=sort_order
+        # Search for REAL arbitrage opportunities
+        results = find_arbitrage_real(
+            keyword=search_term,
+            min_profit=min_profit,
+            limit=limit
         )
         
         # Calculate scan duration
         scan_duration = (datetime.now() - scan_start).total_seconds()
         
-        # Format response
-        result = {
-            'status': 'success',
-            'data': {
-                'listings': listings,
-                'scan_metadata': {
-                    'scan_id': f"PROD_{int(time.time())}_{uuid.uuid4().hex[:8]}",
-                    'duration_seconds': round(scan_duration, 2),
-                    'keyword': keyword,
-                    'category': category,
-                    'subcategory': subcategory,
-                    'results_found': len(listings),
-                    'api_source': 'eBay Browse API (PRODUCTION)',
-                    'timestamp': datetime.now().isoformat(),
-                    'sort_order': sort_order,
-                    'mode': 'REAL_DATA_ONLY'
-                }
-            },
-            'message': f'Found {len(listings)} REAL eBay listings'
-        }
+        # Update scan metadata with actual duration
+        results['scan_metadata']['duration_seconds'] = round(scan_duration, 2)
+        results['scan_metadata']['search_term'] = search_term
+        results['scan_metadata']['min_profit_threshold'] = min_profit
         
-        logger.info(f"✅ PRODUCTION scan completed: {len(listings)} REAL listings in {scan_duration:.2f}s")
-        return jsonify(result)
+        logger.info(f"✅ Real-time scan completed: {results['opportunities_summary']['total_opportunities']} opportunities found in {scan_duration:.2f}s")
+        
+        return jsonify({
+            'status': 'success',
+            'data': results,
+            'message': f'Found {results["opportunities_summary"]["total_opportunities"]} real arbitrage opportunities'
+        })
         
     except Exception as e:
-        logger.error(f"Error during PRODUCTION eBay scan: {e}")
+        logger.error(f"Error during real-time arbitrage scan: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Arbitrage scan failed: {str(e)}',
+            'data': None
+        }), 500
+
+@app.route('/api/search', methods=['POST'])
+def search_ebay_listings():
+    """Search eBay listings endpoint - for basic listing search"""
+    try:
+        if not SCRAPER_AVAILABLE:
+            return jsonify({
+                'status': 'error',
+                'message': 'Real-time scraper is not available',
+                'data': None
+            }), 503
+        
+        request_data = request.get_json() or {}
+        
+        keyword = request_data.get('keyword', '').strip()
+        keywords = request_data.get('keywords', '').strip()
+        
+        search_term = keyword or keywords
+        
+        if not search_term:
+            return jsonify({
+                'status': 'error',
+                'message': 'Search keyword is required',
+                'data': None
+            }), 400
+        
+        limit = min(int(request_data.get('limit', 20)), 50)
+        sort_order = request_data.get('sort', 'price')
+        
+        logger.info(f"🔍 Real-time eBay search: '{search_term}'")
+        
+        # Search for REAL listings
+        listings = search_ebay_real(
+            keyword=search_term,
+            limit=limit,
+            sort=sort_order
+        )
+        
+        result = {
+            'scan_metadata': {
+                'scan_id': f"SEARCH_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'search_term': search_term,
+                'total_listings_found': len(listings),
+                'sort_order': sort_order,
+                'api_source': 'Real-Time Web Scraping',
+                'mode': 'LIVE_EBAY_DATA'
+            },
+            'listings': listings
+        }
+        
+        logger.info(f"✅ Real-time search completed: {len(listings)} listings found")
+        
+        return jsonify({
+            'status': 'success',
+            'data': result,
+            'message': f'Found {len(listings)} real eBay listings'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error during real-time eBay search: {e}")
         return jsonify({
             'status': 'error',
             'message': f'eBay search failed: {str(e)}',
             'data': None
         }), 500
 
-@app.route('/api/scan/quick', methods=['POST'])
-def quick_ebay_scan():
-    """Quick eBay scan with popular keywords - REAL DATA ONLY"""
+@app.route('/api/quick-scan', methods=['POST'])
+def quick_arbitrage_scan():
+    """Quick arbitrage scan with popular keywords"""
     try:
-        if not EBAY_API_WORKING:
+        if not SCRAPER_AVAILABLE:
             return jsonify({
                 'status': 'error',
-                'message': 'eBay API is not working',
+                'message': 'Real-time scraper is not available',
                 'data': None
             }), 503
         
-        logger.info("🚀 Quick PRODUCTION eBay scan requested")
+        logger.info("🚀 Quick real-time arbitrage scan")
         
-        # Popular keywords that should return real results
-        popular_keywords = ["iphone", "airpods", "macbook"]
-        all_listings = []
+        # Popular keywords that often have arbitrage opportunities
+        popular_keyword = "airpods pro"
         
-        for keyword in popular_keywords:
-            listings = search_ebay(keyword=keyword, limit=5, sort="price")
-            all_listings.extend(listings)
-            time.sleep(0.5)  # Small delay between searches
+        results = find_arbitrage_real(
+            keyword=popular_keyword,
+            min_profit=20.0,
+            limit=15
+        )
         
-        result = {
+        # Update metadata
+        results['scan_metadata']['scan_type'] = 'quick'
+        results['scan_metadata']['search_term'] = popular_keyword
+        
+        return jsonify({
             'status': 'success',
-            'data': {
-                'listings': all_listings[:15],  # Top 15
-                'scan_metadata': {
-                    'scan_id': f"QUICK_PROD_{int(time.time())}",
-                    'duration_seconds': 3.5,
-                    'keywords': popular_keywords,
-                    'results_found': len(all_listings),
-                    'api_source': 'eBay Browse API (PRODUCTION)',
-                    'timestamp': datetime.now().isoformat(),
-                    'scan_type': 'quick',
-                    'mode': 'REAL_DATA_ONLY'
-                }
-            },
-            'message': f'Quick scan found {len(all_listings)} REAL items'
-        }
-        
-        return jsonify(result)
+            'data': results,
+            'message': f'Quick scan found {results["opportunities_summary"]["total_opportunities"]} real opportunities'
+        })
         
     except Exception as e:
-        logger.error(f"Error during quick PRODUCTION scan: {e}")
+        logger.error(f"Error during quick real-time scan: {e}")
         return jsonify({
             'status': 'error',
             'message': f'Quick scan failed: {str(e)}',
+            'data': None
+        }), 500
+
+@app.route('/api/trending-scan', methods=['POST'])
+def trending_arbitrage_scan():
+    """Trending arbitrage scan with viral keywords"""
+    try:
+        if not SCRAPER_AVAILABLE:
+            return jsonify({
+                'status': 'error',
+                'message': 'Real-time scraper is not available',
+                'data': None
+            }), 503
+        
+        logger.info("📈 Trending real-time arbitrage scan")
+        
+        trending_keyword = "nintendo switch oled"
+        
+        results = find_arbitrage_real(
+            keyword=trending_keyword,
+            min_profit=25.0,
+            limit=20
+        )
+        
+        # Update metadata
+        results['scan_metadata']['scan_type'] = 'trending'
+        results['scan_metadata']['search_term'] = trending_keyword
+        
+        return jsonify({
+            'status': 'success',
+            'data': results,
+            'message': f'Trending scan found {results["opportunities_summary"]["total_opportunities"]} real opportunities'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error during trending real-time scan: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Trending scan failed: {str(e)}',
+            'data': None
+        }), 500
+
+@app.route('/api/categories', methods=['GET'])
+def get_categories():
+    """Get suggested categories and keywords"""
+    try:
+        categories = {
+            'categories': {
+                'Tech': ['Headphones', 'Smartphones', 'Laptops', 'Tablets'],
+                'Gaming': ['Consoles', 'Video Games', 'Accessories'],
+                'Collectibles': ['Trading Cards', 'Action Figures', 'Coins'],
+                'Fashion': ['Sneakers', 'Designer Items', 'Watches']
+            },
+            'suggested_keywords': {
+                'High Success Rate': [
+                    'airpods pro', 'nintendo switch', 'pokemon cards',
+                    'iphone 14', 'macbook', 'ps5', 'xbox series x'
+                ],
+                'Popular Searches': [
+                    'beats headphones', 'samsung galaxy', 'ipad',
+                    'jordan sneakers', 'supreme', 'rolex watch'
+                ],
+                'Trending Now': [
+                    'viral tiktok products', 'trending 2025',
+                    'limited edition', 'rare collectibles'
+                ]
+            }
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'data': categories,
+            'message': 'Categories and keywords retrieved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting categories: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to retrieve categories',
             'data': None
         }), 500
 
@@ -230,9 +322,11 @@ def not_found(error):
             'message': 'API endpoint not found',
             'available_endpoints': [
                 'GET /api/health',
-                'GET /api/categories',
                 'POST /api/scan',
-                'POST /api/scan/quick'
+                'POST /api/search', 
+                'POST /api/quick-scan',
+                'POST /api/trending-scan',
+                'GET /api/categories'
             ]
         }), 404
     return render_template('index.html'), 404
@@ -244,25 +338,29 @@ def internal_error(error):
         return jsonify({
             'status': 'error', 
             'message': 'Internal server error',
-            'ebay_api_working': EBAY_API_WORKING
+            'scraper_available': SCRAPER_AVAILABLE
         }), 500
     return "Server Error", 500
 
 # ==================== STARTUP ====================
 
 if __name__ == '__main__':
-    print("\n🦅 FlipHawk - PRODUCTION eBay Scanner")
-    print("=" * 50)
-    print("✅ NO DUMMY DATA - REAL eBay LISTINGS ONLY")
-    print(f"✅ eBay API Status: {'WORKING' if EBAY_API_WORKING else 'FAILED'}")
+    print("\n🦅 FlipHawk - Real-Time eBay Arbitrage Scanner")
+    print("=" * 60)
+    print("✅ REAL-TIME WEB SCRAPING - NO DUMMY DATA")
+    print("✅ NO API KEYS NEEDED - DIRECT eBay SCRAPING")
+    print(f"✅ Scraper Status: {'AVAILABLE' if SCRAPER_AVAILABLE else 'UNAVAILABLE'}")
     print(f"🌐 Server: http://localhost:5000")
-    print(f"🔍 Search: http://localhost:5000/search")
+    print(f"🔍 Arbitrage Scanner: http://localhost:5000")
+    print(f"📦 eBay Search: http://localhost:5000/search")
     print(f"📡 API Health: http://localhost:5000/api/health")
-    print("=" * 50)
+    print("=" * 60)
     
-    if not EBAY_API_WORKING:
-        print("❌ WARNING: eBay API is not working!")
-        print("💡 Check your credentials and internet connection")
+    if not SCRAPER_AVAILABLE:
+        print("❌ WARNING: Real-time scraper is not available!")
+        print("💡 Make sure ebay_realtime_scraper.py is in the same directory")
+    else:
+        print("🎯 Ready to find real arbitrage opportunities!")
     
     try:
         app.run(
