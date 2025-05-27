@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlipHawk - eBay Listing Scanner</title>
+    <title>FlipHawk - eBay Arbitrage Scanner</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
@@ -111,6 +111,12 @@
             margin-top: 1rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
         }
 
         /* Container */
@@ -169,7 +175,7 @@
             letter-spacing: 0.05em;
         }
 
-        .form-input {
+        .form-input, .form-select {
             padding: 1rem 1.25rem;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
@@ -180,7 +186,7 @@
             backdrop-filter: blur(10px);
         }
 
-        .form-input:focus {
+        .form-input:focus, .form-select:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
@@ -189,6 +195,53 @@
 
         .form-input::placeholder {
             color: var(--text-muted);
+        }
+
+        /* Category Selector */
+        .category-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .category-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 1rem;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .category-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .category-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .category-icon {
+            font-size: 1.5rem;
         }
 
         /* Button */
@@ -228,7 +281,6 @@
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-            border: none;
         }
 
         .btn-primary:hover {
@@ -236,9 +288,16 @@
             box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
         }
 
-        .btn-primary:active {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+            transform: translateY(-2px);
         }
 
         .btn:disabled {
@@ -497,8 +556,6 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 0.75rem;
-            max-width: 600px;
-            margin: 0 auto;
         }
 
         .quick-search-btn {
@@ -510,27 +567,12 @@
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
             text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            min-height: 48px;
-        }
-
-        .quick-search-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.15), transparent);
-            transition: left 0.6s ease;
         }
 
         .quick-search-btn:hover {
@@ -539,53 +581,6 @@
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25);
             color: var(--primary);
-        }
-
-        .quick-search-btn:hover::before {
-            left: 100%;
-        }
-
-        .quick-search-btn:active {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .quick-search-btn:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-        }
-
-        /* Icon styling for quick search buttons */
-        .quick-search-btn .icon {
-            font-size: 1.1rem;
-            opacity: 0.8;
-        }
-
-        .quick-search-btn:hover .icon {
-            opacity: 1;
-            transform: scale(1.1);
-            transition: all 0.3s ease;
-        }
-
-        /* Responsive adjustments for quick search */
-        @media (max-width: 768px) {
-            .quick-search-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.5rem;
-            }
-            
-            .quick-search-btn {
-                padding: 0.75rem 1rem;
-                font-size: 0.8rem;
-                min-height: 44px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .quick-search-grid {
-                grid-template-columns: 1fr;
-            }
         }
 
         /* Responsive Design */
@@ -613,6 +608,24 @@
             
             .listing-actions {
                 flex-direction: column;
+            }
+            
+            .category-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .quick-search-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .category-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-search-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -643,13 +656,13 @@
         <!-- Header -->
         <header class="header">
             <h1 class="logo">🦅 FlipHawk</h1>
-            <p class="tagline">Real-Time eBay Listing Scanner</p>
+            <p class="tagline">Real-Time eBay Arbitrage Scanner</p>
             <div class="api-badge">✅ eBay Browse API Powered</div>
         </header>
 
         <!-- Search Section -->
         <div class="search-section">
-            <h2 class="search-title">🔍 Search eBay Listings</h2>
+            <h2 class="search-title">🔍 Search eBay for Arbitrage Opportunities</h2>
             
             <form class="search-form" id="searchForm">
                 <div class="form-group">
@@ -662,6 +675,60 @@
                     <div id="searchSpinner" class="spinner" style="display: none;"></div>
                 </button>
             </form>
+
+            <!-- Category Selection -->
+            <div class="category-section">
+                <label class="form-label">📂 Quick Categories</label>
+                <div class="category-grid">
+                    <button type="button" class="category-btn" data-category="Tech">
+                        <span class="category-icon">💻</span>
+                        <span>Tech</span>
+                    </button>
+                    <button type="button" class="category-btn" data-category="Gaming">
+                        <span class="category-icon">🎮</span>
+                        <span>Gaming</span>
+                    </button>
+                    <button type="button" class="category-btn" data-category="Collectibles">
+                        <span class="category-icon">🃏</span>
+                        <span>Cards</span>
+                    </button>
+                    <button type="button" class="category-btn" data-category="Fashion">
+                        <span class="category-icon">👟</span>
+                        <span>Fashion</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Search Buttons -->
+            <div class="quick-search-container">
+                <h4 class="quick-search-title">🔥 Popular Searches</h4>
+                <div class="quick-search-grid">
+                    <button class="quick-search-btn" data-keyword="airpods pro">
+                        <span>🎧</span>
+                        <span>AirPods Pro</span>
+                    </button>
+                    <button class="quick-search-btn" data-keyword="nintendo switch">
+                        <span>🎮</span>
+                        <span>Nintendo Switch</span>
+                    </button>
+                    <button class="quick-search-btn" data-keyword="pokemon cards">
+                        <span>🃏</span>
+                        <span>Pokemon Cards</span>
+                    </button>
+                    <button class="quick-search-btn" data-keyword="iphone 14">
+                        <span>📱</span>
+                        <span>iPhone 14</span>
+                    </button>
+                    <button class="quick-search-btn" data-keyword="macbook">
+                        <span>💻</span>
+                        <span>MacBook</span>
+                    </button>
+                    <button class="quick-search-btn" data-keyword="jordan sneakers">
+                        <span>👟</span>
+                        <span>Jordan Sneakers</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Results Section -->
@@ -675,8 +742,8 @@
                 <div class="empty-state">
                     <div class="empty-icon">🎯</div>
                     <h3 class="empty-title">Ready to Find Deals</h3>
-                    <p class="empty-text">Enter keywords above to search for live eBay listings. Our scanner will find the best deals sorted by price.</p>
-                    <button class="btn btn-primary" onclick="startSearch('airpods pro')">
+                    <p class="empty-text">Enter keywords above to search for live eBay listings. Our scanner will find the best deals sorted by price using the official eBay Browse API.</p>
+                    <button class="btn btn-primary" onclick="quickSearch('airpods pro')">
                         🚀 Start Your First Search
                     </button>
                 </div>
@@ -687,6 +754,7 @@
     <script>
         // Global state
         let isSearching = false;
+        let selectedCategory = null;
 
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
@@ -697,12 +765,47 @@
             // Form submission
             document.getElementById('searchForm').addEventListener('submit', handleSearch);
             
+            // Category buttons
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Toggle category selection
+                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedCategory = this.dataset.category;
+                    
+                    // Update search input with category-specific keywords
+                    updateKeywordsForCategory(selectedCategory);
+                });
+            });
+            
+            // Quick search buttons
+            document.querySelectorAll('.quick-search-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const keyword = this.dataset.keyword;
+                    quickSearch(keyword);
+                });
+            });
+            
             // Enter key trigger
             document.getElementById('keywords').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     handleSearch(e);
                 }
             });
+        }
+
+        function updateKeywordsForCategory(category) {
+            const keywordSuggestions = {
+                'Tech': 'airpods pro, macbook, iphone 14',
+                'Gaming': 'nintendo switch, ps5, xbox series x',
+                'Collectibles': 'pokemon cards, magic cards, baseball cards',
+                'Fashion': 'jordan sneakers, supreme, yeezy'
+            };
+            
+            const input = document.getElementById('keywords');
+            if (!input.value.trim()) {
+                input.placeholder = `e.g., ${keywordSuggestions[category] || 'enter keywords...'}`;
+            }
         }
 
         async function handleSearch(event) {
@@ -717,25 +820,35 @@
                 return;
             }
 
+            await startSearch(keywords, selectedCategory);
+        }
+
+        async function quickSearch(keywords) {
+            if (isSearching) return;
+            
+            document.getElementById('keywords').value = keywords;
             await startSearch(keywords);
         }
 
-        async function startSearch(keywords) {
+        async function startSearch(keywords, category = null) {
             isSearching = true;
             updateSearchButton(true);
             showNotification('Searching eBay listings...', 'info');
 
             try {
+                const searchData = {
+                    keyword: keywords,
+                    category: category,
+                    limit: 20,
+                    sort: 'price'
+                };
+
                 const response = await fetch('/api/scan', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        keywords: keywords,
-                        max_results: 20,
-                        sort: 'price'
-                    })
+                    body: JSON.stringify(searchData)
                 });
 
                 const result = await response.json();
@@ -779,13 +892,14 @@
             const container = document.getElementById('resultsContainer');
             const count = document.getElementById('resultsCount');
             
-            // Get listings from either new format or fallback format
-            const listings = data.listings || data.top_opportunities || [];
+            // Get listings from response
+            const listings = data.listings || [];
+            const metadata = data.scan_metadata || {};
             
             // Update count
             count.textContent = `Found ${listings.length} listings`;
-            if (data.scan_metadata) {
-                count.textContent += ` • ${data.scan_metadata.duration_seconds}s scan • ${data.scan_metadata.api_source || 'eBay API'}`;
+            if (metadata.duration_seconds) {
+                count.textContent += ` • ${metadata.duration_seconds}s • ${metadata.api_source || 'eBay API'}`;
             }
 
             // Display listings
@@ -813,18 +927,18 @@
         }
 
         function createListingCard(listing) {
-            // Handle both eBay API format and fallback format
             const title = listing.title || 'No Title';
-            const price = listing.price || listing.total_cost || 0;
+            const price = listing.price || 0;
             const totalCost = listing.total_cost || price;
             const shippingCost = listing.shipping_cost || 0;
             const condition = listing.condition || 'Unknown';
-            const sellerRating = listing.seller_rating || listing.seller_feedback_percentage + '%' || 'N/A';
-            const sellerFeedback = listing.seller_feedback || listing.seller_feedback_score || 'N/A';
+            const sellerUsername = listing.seller_username || 'Unknown';
+            const sellerRating = listing.seller_feedback_percentage || 0;
+            const sellerFeedback = listing.seller_feedback_score || 0;
             const location = listing.location || 'Unknown';
             const imageUrl = listing.image_url || 'https://via.placeholder.com/80x80/334155/cbd5e1?text=No+Image';
             const ebayLink = listing.ebay_link || '#';
-            const itemId = listing.item_id || listing.opportunity_id || 'unknown';
+            const itemId = listing.item_id || 'unknown';
             
             return `
                 <div class="listing-card slide-in">
@@ -850,11 +964,11 @@
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Seller:</span>
-                            <span class="detail-value">${sellerRating}</span>
+                            <span class="detail-value">${sellerUsername}</span>
                         </div>
                         <div class="detail-item">
-                            <span class="detail-label">Feedback:</span>
-                            <span class="detail-value">${sellerFeedback}</span>
+                            <span class="detail-label">Rating:</span>
+                            <span class="detail-value">${sellerRating.toFixed(1)}% (${sellerFeedback})</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Location:</span>
@@ -870,8 +984,11 @@
                         <a href="${ebayLink}" target="_blank" class="btn btn-ebay btn-small">
                             🛒 View on eBay
                         </a>
-                        <button class="btn btn-primary btn-small" onclick="addToWatchlist('${itemId}')">
-                            👁️ Watch
+                        <button class="btn btn-secondary btn-small" onclick="addToWatchlist('${itemId}')">
+                            👁️ Watch Item
+                        </button>
+                        <button class="btn btn-primary btn-small" onclick="analyzeArbitrage('${itemId}')">
+                            📊 Analyze
                         </button>
                     </div>
                 </div>
@@ -901,6 +1018,11 @@
             // Here you could implement actual watchlist functionality
         }
 
+        function analyzeArbitrage(itemId) {
+            showNotification(`Analyzing arbitrage potential for item ${itemId}...`, 'info');
+            // Here you could implement arbitrage analysis
+        }
+
         function showNotification(message, type = 'info') {
             const notification = document.createElement('div');
             notification.className = `notification notification-${type}`;
@@ -927,79 +1049,6 @@
             }
         `;
         document.head.appendChild(style);
-
-        // Quick search buttons for testing
-        function addQuickSearchButtons() {
-            const searchSection = document.querySelector('.search-section');
-            const quickSearchDiv = document.createElement('div');
-            quickSearchDiv.innerHTML = `
-                <div class="quick-search-container">
-                    <h4 class="quick-search-title">🔥 Popular Searches</h4>
-                    <div class="quick-search-grid">
-                        <button class="quick-search-btn" data-keyword="airpods pro">
-                            <span class="icon">🎧</span>
-                            <span>AirPods Pro</span>
-                        </button>
-                        <button class="quick-search-btn" data-keyword="nintendo switch">
-                            <span class="icon">🎮</span>
-                            <span>Nintendo Switch</span>
-                        </button>
-                        <button class="quick-search-btn" data-keyword="pokemon cards">
-                            <span class="icon">🃏</span>
-                            <span>Pokemon Cards</span>
-                        </button>
-                        <button class="quick-search-btn" data-keyword="iphone 14">
-                            <span class="icon">📱</span>
-                            <span>iPhone 14</span>
-                        </button>
-                        <button class="quick-search-btn" data-keyword="macbook">
-                            <span class="icon">💻</span>
-                            <span>MacBook</span>
-                        </button>
-                        <button class="quick-search-btn" data-keyword="jordan sneakers">
-                            <span class="icon">👟</span>
-                            <span>Jordan Sneakers</span>
-                        </button>
-                    </div>
-                </div>
-            `;
-            searchSection.appendChild(quickSearchDiv);
-            
-            // Add event listeners to quick search buttons
-            const quickButtons = quickSearchDiv.querySelectorAll('.quick-search-btn');
-            quickButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const keyword = this.getAttribute('data-keyword');
-                    quickSearch(keyword);
-                });
-                
-                // Add loading state when clicked
-                button.addEventListener('click', function() {
-                    if (!isSearching) {
-                        this.style.opacity = '0.7';
-                        this.style.transform = 'scale(0.95)';
-                        setTimeout(() => {
-                            this.style.opacity = '1';
-                            this.style.transform = 'scale(1)';
-                        }, 200);
-                    }
-                });
-            });
-        }
-
-        function quickSearch(keyword) {
-            if (isSearching) return;
-            
-            document.getElementById('keywords').value = keyword;
-            
-            // Trigger the search
-            startSearch(keyword);
-        }
-
-        // Add quick search buttons after page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(addQuickSearchButtons, 500);
-        });
     </script>
 </body>
 </html>
