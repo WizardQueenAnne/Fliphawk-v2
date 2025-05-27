@@ -1,455 +1,682 @@
 #!/usr/bin/env python3
 """
-FlipHawk eBay Browse API Integration - PRODUCTION VERSION
-Uses REAL eBay data from production API (no more dummy data!)
+FlipHawk Real-Time eBay Scraper
+NO DUMMY DATA - REAL eBay listings only through web scraping
 """
 
 import requests
-import base64
-import time
 import json
+import time
+import re
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-import re
+from urllib.parse import urlencode, quote_plus
+from bs4 import BeautifulSoup
+import random
+from dataclasses import dataclass, asdict
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class ProductioneBayAPI:
-    """eBay Browse API client using PRODUCTION endpoints with real data"""
+@dataclass
+class eBayListing:
+    """Real eBay listing data structure"""
+    item_id: str
+    title: str
+    price: float
+    shipping_cost: float
+    total_cost: float
+    condition: str
+    seller_username: str
+    seller_rating: str
+    seller_feedback: str
+    image_url: str
+    ebay_link: str
+    location: str
+    listing_date: str
+    watchers: str
+    bids: str
+    time_left: str
+    is_auction: bool
+    buy_it_now_available: bool
+
+class RealTimeeBayScraper:
+    """Real-time eBay scraper using web scraping (no API needed)"""
     
-    def __init__(self, app_id: str, dev_id: str, cert_id: str):
-        self.app_id = app_id
-        self.dev_id = dev_id
-        self.cert_id = cert_id
+    def __init__(self):
+        self.base_url = "https://www.ebay.com"
+        self.search_url = f"{self.base_url}/sch/i.html"
         
-        # PRODUCTION API endpoints (REAL eBay data)
-        self.api_base = "https://api.ebay.com"
-        self.oauth_base = "https://api.ebay.com"
+        # Rotate user agents to avoid detection
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
+        ]
         
-        self.browse_endpoint = f"{self.api_base}/buy/browse/v1"
-        self.oauth_endpoint = f"{self.oauth_base}/identity/v1/oauth2/token"
-        
-        # OAuth token management
-        self.access_token = None
-        self.token_expires_at = 0
-        
-        # Rate limiting
+        self.session = requests.Session()
         self.last_request_time = 0
-        self.min_request_interval = 0.2  # 200ms between requests for production
+        self.min_delay = 1.0  # Minimum delay between requests
         
-        # Keyword variations for better search coverage
-        self.keyword_variations = {
-            'airpods': ['airpod', 'air pods', 'apple earbuds'],
-            'iphone': ['i phone', 'apple phone'],
-            'macbook': ['mac book', 'apple laptop'],
-            'nintendo switch': ['switch console', 'nintendo swich'],
-            'playstation': ['ps5', 'ps4', 'sony playstation'],
-            'xbox': ['microsoft xbox', 'xbox series'],
-            'pokemon': ['pokémon', 'pokemon cards'],
-            'charizard': ['charizard card'],
-            'jordan': ['air jordan', 'jordan sneakers'],
-            'yeezy': ['adidas yeezy'],
-            'supreme': ['supreme clothing'],
-            'beats': ['beats headphones', 'beats by dre'],
-            'bose': ['bose headphones']
-        }
-        
-        # eBay category IDs
-        self.category_ids = {
-            "Tech": {
-                "Headphones": "15052",
-                "Smartphones": "9355",
-                "Laptops": "177",
-                "Tablets": "171485",
-                "Graphics Cards": "27386"
-            },
-            "Gaming": {
-                "Consoles": "139971",
-                "Video Games": "139973",
-                "Gaming Accessories": "54968"
-            },
-            "Collectibles": {
-                "Trading Cards": "2536",
-                "Action Figures": "246",
-                "Coins": "11116"
-            },
-            "Fashion": {
-                "Sneakers": "15709",
-                "Designer Clothing": "1059",
-                "Watches": "14324"
-            }
+        # Track seen items to avoid duplicates
+        self.seen_items = set()
+    
+    def get_headers(self):
+        """Get randomized headers"""
+        return {
+            'User-Agent': random.choice(self.user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
         }
     
-    def get_access_token(self) -> str:
-        """Get OAuth access token for PRODUCTION API calls"""
-        current_time = time.time()
-        
-        # Check if current token is still valid (with 5 min buffer)
-        if self.access_token and current_time < (self.token_expires_at - 300):
-            return self.access_token
-        
-        try:
-            # Encode credentials for OAuth
-            credentials = f"{self.app_id}:{self.cert_id}"
-            encoded_credentials = base64.b64encode(credentials.encode()).decode()
-            
-            headers = {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': f'Basic {encoded_credentials}'
-            }
-            
-            data = {
-                'grant_type': 'client_credentials',
-                'scope': 'https://api.ebay.com/oauth/api_scope'
-            }
-            
-            logger.info("🔑 Requesting PRODUCTION eBay OAuth token...")
-            response = requests.post(self.oauth_endpoint, headers=headers, data=data, timeout=30)
-            
-            if response.status_code == 200:
-                token_data = response.json()
-                self.access_token = token_data['access_token']
-                self.token_expires_at = current_time + token_data['expires_in']
-                
-                logger.info("✅ PRODUCTION eBay OAuth token obtained successfully")
-                return self.access_token
-            else:
-                logger.error(f"❌ OAuth failed: {response.status_code} - {response.text}")
-                raise Exception(f"OAuth authentication failed: {response.status_code}")
-                
-        except Exception as e:
-            logger.error(f"❌ Error getting OAuth token: {e}")
-            raise
-    
-    def _rate_limit(self):
-        """Implement rate limiting for production API"""
+    def rate_limit(self):
+        """Implement rate limiting"""
         current_time = time.time()
         time_since_last = current_time - self.last_request_time
         
-        if time_since_last < self.min_request_interval:
-            sleep_time = self.min_request_interval - time_since_last
+        if time_since_last < self.min_delay:
+            sleep_time = self.min_delay - time_since_last + random.uniform(0.1, 0.5)
             time.sleep(sleep_time)
         
         self.last_request_time = time.time()
     
-    def expand_keywords(self, keyword: str) -> List[str]:
-        """Expand keywords with variations"""
-        if not keyword:
-            return ['']
-            
-        expanded = [keyword.lower().strip()]
+    def build_search_url(self, keyword: str, page: int = 1, sort_order: str = "price") -> str:
+        """Build eBay search URL"""
+        params = {
+            '_nkw': keyword,
+            '_pgn': page,
+            '_ipg': 240,  # Max items per page
+            'LH_BIN': 1,  # Buy It Now only
+            'LH_Complete': 0,  # Active listings only
+            'LH_Sold': 0,  # Not sold
+            'rt': 'nc',   # No category redirect
+            '_sacat': 0,  # All categories
+        }
         
-        # Add variations from our dictionary
-        for base_word, variations in self.keyword_variations.items():
-            if base_word in keyword.lower():
-                expanded.extend(variations[:2])  # Limit to 2 variations
-                break
+        # Sort options
+        sort_mapping = {
+            'price': 15,    # Price + shipping: lowest first
+            'newest': 10,   # Time: newly listed
+            'ending': 1,    # Time: ending soonest
+            'popular': 12   # Best Match
+        }
         
-        # Remove duplicates
-        seen = set()
-        unique_keywords = []
-        for kw in expanded:
-            if kw not in seen:
-                seen.add(kw)
-                unique_keywords.append(kw)
+        params['_sop'] = sort_mapping.get(sort_order, 15)
         
-        return unique_keywords[:2]  # Max 2 keywords for production API limits
+        query_string = urlencode(params)
+        return f"{self.search_url}?{query_string}"
     
-    def search_ebay(self, keyword: str = None, category: str = None, subcategory: str = None, 
-                   limit: int = 20, sort_order: str = "price") -> List[Dict]:
-        """
-        Search PRODUCTION eBay for REAL listings
-        """
-        
-        try:
-            # Get fresh access token
-            token = self.get_access_token()
-            
-            # Prepare headers for PRODUCTION
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-                'X-EBAY-C-ENDUSERCTX': 'contextualLocation=country=US,zip=10001',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-            
-            # Get keyword variations
-            keywords_to_search = self.expand_keywords(keyword) if keyword else ['']
-            all_listings = []
-            
-            for search_keyword in keywords_to_search:
-                logger.info(f"🔍 Searching PRODUCTION eBay for: '{search_keyword or 'category browse'}'")
+    def get_page(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
+        """Fetch and parse eBay page"""
+        for attempt in range(retries):
+            try:
+                self.rate_limit()
                 
-                # Build search parameters
-                params = {
-                    'limit': min(limit, 50),  # Conservative limit for production
-                    'sort': sort_order,
-                    'filter': []
-                }
-                
-                # Add keyword if provided
-                if search_keyword:
-                    params['q'] = search_keyword
-                
-                # Add category filter if specified
-                if category and subcategory:
-                    category_id = self.category_ids.get(category, {}).get(subcategory)
-                    if category_id:
-                        params['filter'].append(f'categoryIds:{category_id}')
-                
-                # Add filters for better results
-                params['filter'].extend([
-                    'buyingOptions:{FIXED_PRICE}',  # Buy It Now only
-                    'itemLocationCountry:US',       # US sellers only
-                    'deliveryCountry:US',           # Ships to US
-                ])
-                
-                # Convert filter array to string
-                if params['filter']:
-                    params['filter'] = '|'.join(params['filter'])
-                else:
-                    del params['filter']
-                
-                # Rate limiting
-                self._rate_limit()
-                
-                # Make PRODUCTION API request
-                url = f"{self.browse_endpoint}/item_summary/search"
-                response = requests.get(url, headers=headers, params=params, timeout=30)
+                headers = self.get_headers()
+                response = self.session.get(url, headers=headers, timeout=15)
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    items = data.get('itemSummaries', [])
+                    soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    logger.info(f"✅ Found {len(items)} REAL items for '{search_keyword}'")
-                    
-                    # Parse each item
-                    for item in items:
-                        try:
-                            parsed_item = self._parse_item(item)
-                            if parsed_item and parsed_item['price'] > 0:
-                                all_listings.append(parsed_item)
-                        except Exception as e:
-                            logger.warning(f"⚠️ Error parsing item: {e}")
-                            continue
+                    # Verify it's a valid eBay page
+                    if soup.find('title') and 'eBay' in soup.get_text():
+                        return soup
+                    else:
+                        logger.warning(f"Invalid eBay page content")
+                        return None
                 
                 elif response.status_code == 429:
-                    logger.warning("⚠️ Rate limited by eBay API, waiting...")
-                    time.sleep(10)
-                    continue
-                    
-                elif response.status_code == 401:
-                    logger.warning("🔑 Token expired, refreshing...")
-                    self.access_token = None
-                    token = self.get_access_token()
-                    headers['Authorization'] = f'Bearer {token}'
-                    continue
+                    wait_time = (2 ** attempt) + random.uniform(5, 15)
+                    logger.warning(f"Rate limited, waiting {wait_time:.1f}s...")
+                    time.sleep(wait_time)
                     
                 else:
-                    logger.error(f"❌ API error: {response.status_code} - {response.text}")
-                    continue
-                
-                # Delay between keyword variations
-                time.sleep(1)
-            
-            # Remove duplicates and sort
-            unique_listings = self._deduplicate_listings(all_listings)
-            
-            if sort_order == "price":
-                unique_listings.sort(key=lambda x: x['total_cost'])
-            elif sort_order == "newest":
-                unique_listings.sort(key=lambda x: x['item_creation_date'], reverse=True)
-            
-            logger.info(f"🎯 PRODUCTION search completed: {len(unique_listings)} REAL listings")
-            return unique_listings[:limit]
-            
-        except Exception as e:
-            logger.error(f"❌ PRODUCTION eBay search failed: {e}")
-            return []
+                    logger.warning(f"HTTP {response.status_code} for {url}")
+                    if attempt < retries - 1:
+                        time.sleep(random.uniform(2, 5))
+                        
+            except Exception as e:
+                logger.error(f"Error fetching page (attempt {attempt + 1}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(random.uniform(3, 8))
+        
+        return None
     
-    def _parse_item(self, item: Dict) -> Optional[Dict]:
-        """Parse eBay API item response into clean format"""
+    def extract_listing_data(self, item_soup: BeautifulSoup, keyword: str) -> Optional[eBayListing]:
+        """Extract real listing data from eBay HTML"""
         try:
-            # Basic item info
-            item_id = item.get('itemId', '')
-            title = item.get('title', '')
+            # Extract title
+            title_selectors = [
+                'h3.s-item__title span[role="heading"]',
+                'h3.s-item__title',
+                '.s-item__title span',
+                '.s-item__title'
+            ]
             
-            if not item_id or not title:
+            title = None
+            for selector in title_selectors:
+                title_elem = item_soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    break
+            
+            if not title or len(title) < 10:
                 return None
             
-            # Price information
-            price_info = item.get('price', {})
-            price = float(price_info.get('value', 0))
-            currency = price_info.get('currency', 'USD')
+            # Skip promotional content
+            skip_patterns = [
+                'shop on ebay', 'sponsored', 'advertisement', 'see more like this',
+                'you may also like', 'trending at', 'shop with confidence'
+            ]
             
-            # Shipping information
+            if any(pattern in title.lower() for pattern in skip_patterns):
+                return None
+            
+            # Extract price
+            price = 0.0
+            price_selectors = [
+                '.s-item__price .notranslate',
+                '.s-item__price span.POSITIVE',
+                '.s-item__price'
+            ]
+            
+            for selector in price_selectors:
+                price_elem = item_soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    
+                    # Handle price ranges
+                    if 'to' in price_text.lower() or ' - ' in price_text:
+                        prices = re.findall(r'\$?([\d,]+\.?\d*)', price_text)
+                        if prices:
+                            try:
+                                price = float(prices[0].replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
+                    else:
+                        price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text)
+                        if price_match:
+                            try:
+                                price = float(price_match.group(1).replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
+            
+            if price <= 0 or price > 50000:
+                return None
+            
+            # Extract shipping cost
             shipping_cost = 0.0
-            shipping_options = item.get('shippingOptions', [])
-            if shipping_options:
-                shipping_info = shipping_options[0]
-                shipping_cost_info = shipping_info.get('shippingCost', {})
-                if shipping_cost_info:
-                    shipping_cost = float(shipping_cost_info.get('value', 0))
+            shipping_selectors = [
+                '.s-item__shipping .vi-price .notranslate',
+                '.s-item__shipping'
+            ]
+            
+            for selector in shipping_selectors:
+                shipping_elem = item_soup.select_one(selector)
+                if shipping_elem:
+                    shipping_text = shipping_elem.get_text(strip=True).lower()
+                    
+                    if 'free' in shipping_text:
+                        shipping_cost = 0.0
+                        break
+                    elif '$' in shipping_text:
+                        shipping_match = re.search(r'\$?([\d,]+\.?\d*)', shipping_text)
+                        if shipping_match:
+                            try:
+                                shipping_cost = float(shipping_match.group(1).replace(',', ''))
+                                shipping_cost = min(shipping_cost, price * 0.5)  # Cap shipping
+                                break
+                            except ValueError:
+                                continue
             
             total_cost = price + shipping_cost
             
-            # Condition
-            condition_info = item.get('condition', {})
-            condition = condition_info.get('conditionDisplayName', 'Unknown')
+            # Extract eBay link
+            ebay_link = ""
+            link_selectors = [
+                'a.s-item__link',
+                '.s-item__title a',
+                'h3.s-item__title a'
+            ]
             
-            # Category
-            categories = item.get('categories', [])
-            category_path = ' > '.join([cat.get('categoryName', '') for cat in categories]) if categories else 'Unknown'
+            for selector in link_selectors:
+                link_elem = item_soup.select_one(selector)
+                if link_elem:
+                    href = link_elem.get('href', '')
+                    if href:
+                        if href.startswith('//'):
+                            ebay_link = 'https:' + href
+                        elif href.startswith('/'):
+                            ebay_link = 'https://www.ebay.com' + href
+                        elif href.startswith('http'):
+                            ebay_link = href
+                        
+                        # Clean URL
+                        if '?' in ebay_link:
+                            ebay_link = ebay_link.split('?')[0]
+                        
+                        if 'ebay.com' in ebay_link:
+                            break
             
-            # Seller information
-            seller_info = item.get('seller', {})
-            seller_username = seller_info.get('username', 'Unknown')
-            seller_feedback = float(seller_info.get('feedbackPercentage', 0))
-            seller_score = int(seller_info.get('feedbackScore', 0))
+            if not ebay_link:
+                return None
             
-            # Images
-            image_info = item.get('image', {})
-            image_url = image_info.get('imageUrl', '')
+            # Extract item ID
+            item_id = None
+            item_id_patterns = [
+                r'/itm/([^/]+/)?(\d{12,})',
+                r'/(\d{12,})',
+                r'item/(\d{12,})'
+            ]
             
-            # Item URL
-            ebay_link = item.get('itemWebUrl', '')
+            for pattern in item_id_patterns:
+                match = re.search(pattern, ebay_link)
+                if match:
+                    groups = match.groups()
+                    item_id = groups[-1] if groups else None
+                    if item_id and item_id.isdigit() and len(item_id) >= 12:
+                        break
             
-            # Location
-            item_location = item.get('itemLocation', {})
-            location = item_location.get('city', 'Unknown')
-            if item_location.get('country'):
-                location = f"{location}, {item_location.get('country')}"
+            if not item_id:
+                import hashlib
+                item_id = str(abs(hash(ebay_link + title)))[:12]
             
-            # Additional attributes
-            returns_accepted = item.get('returnsAccepted', False)
-            top_rated = item.get('topRatedListing', False)
-            buying_options = item.get('buyingOptions', [])
-            creation_date = item.get('itemCreationDate', '')
+            # Check for duplicates
+            if item_id in self.seen_items:
+                return None
+            self.seen_items.add(item_id)
             
-            return {
-                'item_id': item_id,
-                'title': title,
-                'price': price,
-                'currency': currency,
-                'shipping_cost': shipping_cost,
-                'total_cost': total_cost,
-                'condition': condition,
-                'category_path': category_path,
-                'seller_username': seller_username,
-                'seller_feedback_percentage': seller_feedback,
-                'seller_feedback_score': seller_score,
-                'image_url': image_url,
-                'ebay_link': ebay_link,
-                'location': location,
-                'returns_accepted': returns_accepted,
-                'top_rated_listing': top_rated,
-                'buying_options': buying_options,
-                'item_creation_date': creation_date,
-                'parsed_at': datetime.now().isoformat()
-            }
+            # Extract condition
+            condition = "Unknown"
+            condition_selectors = [
+                '.SECONDARY_INFO',
+                '.s-item__subtitle',
+                '.s-item__condition'
+            ]
+            
+            for selector in condition_selectors:
+                condition_elem = item_soup.select_one(selector)
+                if condition_elem:
+                    condition_text = condition_elem.get_text(strip=True)
+                    
+                    condition_keywords = [
+                        'brand new', 'new', 'new with tags', 'sealed',
+                        'open box', 'like new', 'excellent', 'very good', 'good',
+                        'acceptable', 'used', 'pre-owned', 'refurbished'
+                    ]
+                    
+                    condition_lower = condition_text.lower()
+                    for keyword_cond in condition_keywords:
+                        if keyword_cond in condition_lower:
+                            condition = condition_text
+                            break
+                    
+                    if condition != "Unknown":
+                        break
+            
+            # Extract seller info
+            seller_username = "Unknown"
+            seller_rating = "Not available"
+            seller_feedback = "Not available"
+            
+            seller_selectors = [
+                '.s-item__seller-info-text',
+                '.s-item__seller-info'
+            ]
+            
+            for selector in seller_selectors:
+                seller_elem = item_soup.select_one(selector)
+                if seller_elem:
+                    seller_text = seller_elem.get_text(strip=True)
+                    
+                    # Extract rating
+                    rating_match = re.search(r'([\d.]+)%\s*positive', seller_text.lower())
+                    if rating_match:
+                        seller_rating = f"{rating_match.group(1)}%"
+                    
+                    # Extract feedback count
+                    feedback_patterns = [
+                        r'\((\d{1,3}(?:,\d{3})*)\)',
+                        r'(\d{1,3}(?:,\d{3})*)\s*feedback'
+                    ]
+                    
+                    for pattern in feedback_patterns:
+                        count_match = re.search(pattern, seller_text)
+                        if count_match:
+                            seller_feedback = count_match.group(1)
+                            break
+                    
+                    if seller_rating != "Not available":
+                        break
+            
+            # Extract image URL
+            image_url = ""
+            image_selectors = [
+                '.s-item__image img',
+                '.s-item__wrapper img'
+            ]
+            
+            for selector in image_selectors:
+                img_elem = item_soup.select_one(selector)
+                if img_elem:
+                    src = img_elem.get('src') or img_elem.get('data-src')
+                    if src:
+                        if 's-l' in src:
+                            src = re.sub(r's-l\d+', 's-l500', src)
+                        
+                        if src.startswith('//'):
+                            image_url = 'https:' + src
+                        elif src.startswith('/'):
+                            image_url = 'https://www.ebay.com' + src
+                        else:
+                            image_url = src
+                        break
+            
+            # Extract location
+            location = "Unknown"
+            location_selectors = [
+                '.s-item__location',
+                '.s-item__itemLocation'
+            ]
+            
+            for selector in location_selectors:
+                location_elem = item_soup.select_one(selector)
+                if location_elem:
+                    location_text = location_elem.get_text(strip=True)
+                    if location_text:
+                        location = location_text.replace('From', '').replace('from', '').strip()
+                    break
+            
+            # Additional info
+            is_auction = bool(item_soup.select_one('.s-item__time-left, .timeMs'))
+            watchers = "Not available"
+            bids = "0" if not is_auction else "Unknown"
+            time_left = "Buy It Now" if not is_auction else "Unknown"
+            
+            return eBayListing(
+                item_id=item_id,
+                title=title,
+                price=price,
+                shipping_cost=shipping_cost,
+                total_cost=total_cost,
+                condition=condition,
+                seller_username=seller_username,
+                seller_rating=seller_rating,
+                seller_feedback=seller_feedback,
+                image_url=image_url,
+                ebay_link=ebay_link,
+                location=location,
+                listing_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                watchers=watchers,
+                bids=bids,
+                time_left=time_left,
+                is_auction=is_auction,
+                buy_it_now_available=not is_auction
+            )
             
         except Exception as e:
-            logger.error(f"❌ Error parsing item: {e}")
+            logger.error(f"Error extracting listing data: {e}")
             return None
     
-    def _deduplicate_listings(self, listings: List[Dict]) -> List[Dict]:
-        """Remove duplicate listings based on item_id"""
-        seen_ids = set()
-        unique_listings = []
+    def search_ebay(self, keyword: str, limit: int = 50, sort_order: str = "price", 
+                   max_pages: int = 3) -> List[eBayListing]:
+        """Search eBay for real listings"""
+        logger.info(f"🔍 Searching eBay for: '{keyword}' (limit: {limit})")
         
-        for listing in listings:
-            if listing['item_id'] not in seen_ids:
-                seen_ids.add(listing['item_id'])
-                unique_listings.append(listing)
+        all_listings = []
         
-        return unique_listings
+        for page in range(1, max_pages + 1):
+            try:
+                url = self.build_search_url(keyword, page, sort_order)
+                soup = self.get_page(url)
+                
+                if not soup:
+                    logger.warning(f"Failed to get page {page} for '{keyword}'")
+                    break
+                
+                # Find item containers
+                items = soup.select('.s-item__wrapper, .s-item')
+                
+                if not items:
+                    logger.warning(f"No items found on page {page}")
+                    break
+                
+                logger.info(f"Found {len(items)} items on page {page}")
+                
+                page_listings = []
+                for item in items:
+                    listing = self.extract_listing_data(item, keyword)
+                    if listing:
+                        page_listings.append(listing)
+                
+                all_listings.extend(page_listings)
+                logger.info(f"Extracted {len(page_listings)} valid listings from page {page}")
+                
+                # Stop if we have enough listings
+                if len(all_listings) >= limit:
+                    break
+                
+                # Rate limiting between pages
+                time.sleep(random.uniform(2.0, 4.0))
+                
+            except Exception as e:
+                logger.error(f"Error searching page {page}: {e}")
+                continue
+        
+        # Sort by price if requested
+        if sort_order == "price":
+            all_listings.sort(key=lambda x: x.total_cost)
+        
+        logger.info(f"✅ Search completed: {len(all_listings)} real listings found")
+        return all_listings[:limit]
+    
+    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
+        """Find arbitrage opportunities by comparing similar listings"""
+        logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
+        
+        opportunities = []
+        
+        # Group similar products
+        from difflib import SequenceMatcher
+        
+        for i, buy_listing in enumerate(listings[:-1]):
+            for sell_listing in listings[i+1:]:
+                
+                # Calculate title similarity
+                similarity = SequenceMatcher(None, 
+                                           buy_listing.title.lower(), 
+                                           sell_listing.title.lower()).ratio()
+                
+                # Must be similar enough (same product)
+                if similarity < 0.6:
+                    continue
+                
+                # Must have meaningful price difference
+                price_diff = sell_listing.total_cost - buy_listing.total_cost
+                if price_diff < min_profit:
+                    continue
+                
+                # Calculate fees and net profit
+                gross_profit = sell_listing.price - buy_listing.total_cost
+                ebay_fees = sell_listing.price * 0.129  # ~12.9% eBay final value fee
+                paypal_fees = sell_listing.price * 0.0349 + 0.49  # PayPal fees
+                shipping_cost = 8.0 if sell_listing.shipping_cost == 0 else 0
+                
+                total_fees = ebay_fees + paypal_fees + shipping_cost
+                net_profit = gross_profit - total_fees
+                
+                if net_profit >= min_profit:
+                    roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
+                    
+                    # Calculate confidence
+                    confidence = 40
+                    if similarity > 0.8:
+                        confidence += 30
+                    elif similarity > 0.7:
+                        confidence += 20
+                    elif similarity > 0.6:
+                        confidence += 10
+                    
+                    if net_profit >= 30:
+                        confidence += 20
+                    elif net_profit >= 20:
+                        confidence += 15
+                    elif net_profit >= 15:
+                        confidence += 10
+                    
+                    if 'new' in buy_listing.condition.lower():
+                        confidence += 10
+                    
+                    opportunity = {
+                        'opportunity_id': f"REAL_{int(time.time())}_{random.randint(1000, 9999)}",
+                        'buy_listing': asdict(buy_listing),
+                        'sell_reference': asdict(sell_listing),
+                        'similarity_score': round(similarity, 3),
+                        'confidence_score': min(95, confidence),
+                        'risk_level': 'LOW' if roi < 50 else 'MEDIUM' if roi < 100 else 'HIGH',
+                        'gross_profit': round(gross_profit, 2),
+                        'net_profit_after_fees': round(net_profit, 2),
+                        'roi_percentage': round(roi, 1),
+                        'estimated_fees': round(total_fees, 2),
+                        'profit_analysis': {
+                            'gross_profit': gross_profit,
+                            'net_profit_after_fees': net_profit,
+                            'roi_percentage': roi,
+                            'estimated_fees': total_fees,
+                            'fee_breakdown': {
+                                'ebay_fee': ebay_fees,
+                                'payment_fee': paypal_fees,
+                                'shipping_cost': shipping_cost
+                            }
+                        },
+                        'created_at': datetime.now().isoformat()
+                    }
+                    
+                    opportunities.append(opportunity)
+        
+        # Sort by profitability
+        opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
+        
+        logger.info(f"✅ Found {len(opportunities)} real arbitrage opportunities")
+        return opportunities[:20]  # Return top 20
 
-# Initialize the PRODUCTION API client
-ebay_api = ProductioneBayAPI(
-    app_id="JackDail-FlipHawk-SBX-bf00e7bcf-34d63630",  # Your App ID
-    dev_id="f20a1274-fea2-4041-a8dc-721ecf5f38e9",      # Your Dev ID
-    cert_id="SBX-f00e7bcfbabb-98f9-4d3a-bd03-5ff9"      # Your Cert ID
-)
+# Global scraper instance
+scraper = RealTimeeBayScraper()
 
-def search_ebay(keyword: str = None, category: str = None, subcategory: str = None, 
-               limit: int = 20, sort: str = "price") -> List[Dict]:
-    """
-    Main search function for FlipHawk - REAL eBay data only!
-    """
+def search_ebay_real(keyword: str, limit: int = 50, sort: str = "price") -> List[Dict]:
+    """Main function to search eBay for real listings"""
     try:
-        logger.info(f"🚀 FlipHawk PRODUCTION search: '{keyword}' in {category}/{subcategory}")
-        
-        # Search using PRODUCTION eBay API
-        listings = ebay_api.search_ebay(
-            keyword=keyword,
-            category=category,
-            subcategory=subcategory,
-            limit=limit,
-            sort_order=sort
-        )
-        
-        logger.info(f"✅ FlipHawk PRODUCTION search completed: {len(listings)} REAL listings found")
-        return listings
-        
+        listings = scraper.search_ebay(keyword, limit, sort)
+        return [asdict(listing) for listing in listings]
     except Exception as e:
-        logger.error(f"❌ FlipHawk PRODUCTION search failed: {e}")
+        logger.error(f"Real eBay search failed: {e}")
         return []
 
-def get_categories() -> Dict:
-    """Get available categories and keyword suggestions"""
+def find_arbitrage_real(keyword: str, min_profit: float = 15.0, limit: int = 50) -> Dict:
+    """Find real arbitrage opportunities"""
     try:
+        start_time = datetime.now()
+        
+        # Get real listings
+        listings = scraper.search_ebay(keyword, limit, "price")
+        
+        # Find arbitrage opportunities
+        opportunities = scraper.find_arbitrage_opportunities(listings, min_profit)
+        
+        # Calculate summary
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        total_opportunities = len(opportunities)
+        avg_profit = sum(opp['net_profit_after_fees'] for opp in opportunities) / max(total_opportunities, 1)
+        highest_profit = max([opp['net_profit_after_fees'] for opp in opportunities], default=0)
+        avg_roi = sum(opp['roi_percentage'] for opp in opportunities) / max(total_opportunities, 1)
+        
         return {
-            'categories': ebay_api.category_ids,
-            'keyword_suggestions': {
-                "Tech": {
-                    "Headphones": ["airpods", "beats", "bose", "sony headphones"],
-                    "Smartphones": ["iphone", "samsung galaxy", "google pixel"],
-                    "Laptops": ["macbook", "thinkpad", "dell xps", "gaming laptop"],
-                    "Graphics Cards": ["rtx 4090", "rtx 4080", "nvidia", "amd gpu"],
-                    "Tablets": ["ipad", "samsung tablet", "surface pro"]
-                },
-                "Gaming": {
-                    "Consoles": ["ps5", "xbox series x", "nintendo switch"],
-                    "Video Games": ["call of duty", "fifa", "pokemon", "zelda"],
-                    "Gaming Accessories": ["gaming chair", "mechanical keyboard"]
-                },
-                "Collectibles": {
-                    "Trading Cards": ["pokemon cards", "magic cards", "charizard"],
-                    "Action Figures": ["hot toys", "funko pop", "marvel legends"],
-                    "Coins": ["morgan dollar", "gold coin", "silver coin"]
-                },
-                "Fashion": {
-                    "Sneakers": ["air jordan", "yeezy", "nike dunk", "adidas"],
-                    "Designer Clothing": ["supreme", "off white", "gucci"],
-                    "Watches": ["rolex", "omega", "apple watch"]
+            'scan_metadata': {
+                'scan_id': f"REAL_{int(time.time())}",
+                'timestamp': end_time.isoformat(),
+                'duration_seconds': round(duration, 2),
+                'total_searches_performed': 1,
+                'total_listings_analyzed': len(listings),
+                'arbitrage_opportunities_found': total_opportunities,
+                'scan_efficiency': round((total_opportunities / max(len(listings), 1)) * 100, 2),
+                'keywords_used': [keyword],
+                'unique_products_found': len(listings)
+            },
+            'opportunities_summary': {
+                'total_opportunities': total_opportunities,
+                'average_profit_after_fees': round(avg_profit, 2),
+                'average_roi': round(avg_roi, 1),
+                'highest_profit': round(highest_profit, 2),
+                'risk_distribution': {
+                    'low': len([opp for opp in opportunities if opp['risk_level'] == 'LOW']),
+                    'medium': len([opp for opp in opportunities if opp['risk_level'] == 'MEDIUM']),
+                    'high': len([opp for opp in opportunities if opp['risk_level'] == 'HIGH'])
                 }
-            }
+            },
+            'top_opportunities': opportunities
         }
+        
     except Exception as e:
-        logger.error(f"❌ Error getting categories: {e}")
-        return {'categories': {}, 'keyword_suggestions': {}}
+        logger.error(f"Arbitrage analysis failed: {e}")
+        return {
+            'scan_metadata': {'error': str(e)},
+            'opportunities_summary': {'total_opportunities': 0},
+            'top_opportunities': []
+        }
 
-# For backward compatibility
-api_client = ebay_api
+# Demo function
+def demo_real_scraper():
+    """Demo the real scraper"""
+    print("🚀 FlipHawk Real-Time eBay Scraper Demo")
+    print("=" * 50)
+    print("⚠️  This scrapes REAL eBay data - NO DUMMY DATA")
+    print()
+    
+    test_keyword = "airpods pro"
+    
+    print(f"🔍 Searching for: '{test_keyword}'")
+    results = find_arbitrage_real(test_keyword, min_profit=10.0, limit=20)
+    
+    print(f"\n📊 REAL RESULTS:")
+    print(f"⏱️  Duration: {results['scan_metadata']['duration_seconds']} seconds")
+    print(f"🔍 Listings analyzed: {results['scan_metadata']['total_listings_analyzed']}")
+    print(f"💎 Arbitrage opportunities: {results['opportunities_summary']['total_opportunities']}")
+    
+    if results['top_opportunities']:
+        print(f"\n🏆 TOP ARBITRAGE OPPORTUNITIES:")
+        for i, opp in enumerate(results['top_opportunities'][:3], 1):
+            buy = opp['buy_listing']
+            sell = opp['sell_reference']
+            
+            print(f"\n{i}. OPPORTUNITY #{opp['opportunity_id']}")
+            print(f"   🛒 Buy: {buy['title'][:60]}...")
+            print(f"   💰 Buy Price: ${buy['total_cost']:.2f}")
+            print(f"   💸 Sell Reference: ${sell['price']:.2f}")
+            print(f"   💵 Net Profit: ${opp['net_profit_after_fees']:.2f}")
+            print(f"   📈 ROI: {opp['roi_percentage']:.1f}%")
+            print(f"   🎯 Confidence: {opp['confidence_score']}%")
+            print(f"   🔗 Buy Link: {buy['ebay_link']}")
+    else:
+        print("\n❌ No arbitrage opportunities found")
+        print("💡 Try different keywords or lower the minimum profit")
+    
+    print("\n" + "=" * 50)
+    print("✅ Real demo completed!")
 
 if __name__ == "__main__":
-    # Test the PRODUCTION API
-    print("🚀 Testing PRODUCTION eBay API")
-    print("=" * 50)
-    
-    results = search_ebay("airpods", limit=3)
-    
-    if results:
-        print(f"✅ Found {len(results)} REAL eBay listings:")
-        for i, item in enumerate(results, 1):
-            print(f"{i}. {item['title'][:60]}...")
-            print(f"   💰 ${item['price']:.2f} + ${item['shipping_cost']:.2f} = ${item['total_cost']:.2f}")
-            print(f"   🏪 {item['seller_username']} ({item['seller_feedback_percentage']:.1f}%)")
-            print(f"   🔗 {item['ebay_link']}")
-            print()
-    else:
-        print("❌ No results found")
+    demo_real_scraper()
