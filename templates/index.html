@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlipHawk - AI-Powered Arbitrage Scanner</title>
+    <title>FlipHawk - Real-Time Arbitrage Scanner</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
@@ -15,12 +15,11 @@
 
         :root {
             --primary: #667eea;
-            --primary-dark: #5a67d8;
             --secondary: #764ba2;
-            --accent: #06b6d4;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
+            --accent: #06b6d4;
             
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
@@ -34,7 +33,6 @@
             --text-muted: #64748b;
             
             --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            --glow: 0 0 50px rgba(102, 126, 234, 0.3);
         }
 
         body {
@@ -45,41 +43,15 @@
             overflow-x: hidden;
         }
 
-        /* Animated Background */
-        .bg-animation {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            overflow: hidden;
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
         }
 
-        .bg-animation::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at 25% 25%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
-                        radial-gradient(circle at 75% 75%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
-            animation: float 20s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(30px, -30px) rotate(120deg); }
-            66% { transform: translate(-20px, 20px) rotate(240deg); }
-        }
-
-        /* Header */
         .header {
-            position: relative;
-            padding: 2rem 0;
             text-align: center;
-            margin-bottom: 3rem;
+            padding: 2rem 0 3rem;
         }
 
         .logo {
@@ -90,24 +62,27 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
             margin-bottom: 0.5rem;
-            text-shadow: 0 0 50px rgba(102, 126, 234, 0.5);
         }
 
         .tagline {
             font-size: 1.25rem;
             color: var(--text-secondary);
             font-weight: 500;
-            opacity: 0.9;
+            margin-bottom: 1rem;
         }
 
-        /* Container */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
+        .status-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        /* Main Content Grid */
         .main-grid {
             display: grid;
             grid-template-columns: 1fr 2fr;
@@ -115,7 +90,6 @@
             margin-bottom: 3rem;
         }
 
-        /* Control Panel */
         .control-panel {
             background: var(--surface);
             backdrop-filter: blur(20px);
@@ -145,7 +119,6 @@
             background-clip: text;
         }
 
-        /* Form Groups */
         .form-group {
             margin-bottom: 2rem;
         }
@@ -160,7 +133,7 @@
             letter-spacing: 0.05em;
         }
 
-        .form-input, .form-select {
+        .form-input {
             width: 100%;
             padding: 1rem 1.25rem;
             background: rgba(255, 255, 255, 0.05);
@@ -172,7 +145,7 @@
             backdrop-filter: blur(10px);
         }
 
-        .form-input:focus, .form-select:focus {
+        .form-input:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
@@ -183,39 +156,49 @@
             color: var(--text-muted);
         }
 
-        /* Category Pills */
-        .category-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+        /* Quick Category Buttons */
+        .quick-categories {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
         }
 
-        .category-pill {
-            padding: 0.75rem 1.25rem;
+        .category-btn {
+            padding: 1rem;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 500;
+            border-radius: 16px;
             cursor: pointer;
             transition: all 0.3s ease;
-            user-select: none;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-primary);
         }
 
-        .category-pill:hover {
+        .category-btn:hover {
             background: var(--surface-hover);
+            border-color: var(--primary);
             transform: translateY(-2px);
         }
 
-        .category-pill.active {
+        .category-btn.active {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             border-color: var(--primary);
             color: white;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
 
-        /* Range Slider */
+        .category-icon {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .category-name {
+            font-size: 0.9rem;
+        }
+
+        /* Range Sliders */
         .range-group {
             margin-bottom: 1.5rem;
         }
@@ -273,21 +256,7 @@
             text-decoration: none;
             position: relative;
             overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
             width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn:hover::before {
-            left: 100%;
         }
 
         .btn-primary {
@@ -306,19 +275,12 @@
             border: 1px solid var(--border);
             color: var(--text-primary);
             backdrop-filter: blur(10px);
+            margin-bottom: 1rem;
         }
 
         .btn-secondary:hover {
             background: var(--surface-hover);
             transform: translateY(-2px);
-        }
-
-        .btn-scan {
-            width: 100%;
-            margin-top: 1rem;
-            font-size: 1.1rem;
-            padding: 1.25rem 2rem;
-            position: relative;
         }
 
         .btn:disabled {
@@ -327,7 +289,6 @@
             transform: none !important;
         }
 
-        /* Loading Spinner */
         .spinner {
             width: 20px;
             height: 20px;
@@ -367,19 +328,15 @@
         }
 
         .results-stats {
-            display: flex;
-            gap: 2rem;
             font-size: 0.875rem;
             color: var(--text-secondary);
         }
 
-        /* Product Cards */
-        .product-grid {
+        .arbitrage-grid {
             display: grid;
             gap: 2rem;
         }
 
-        /* Arbitrage Opportunity Card */
         .arbitrage-card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -414,21 +371,18 @@
         .arbitrage-header {
             padding: 1.5rem;
             border-bottom: 1px solid var(--border);
-            background: rgba(255, 255, 255, 0.02);
         }
 
         .arbitrage-title {
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 0.5rem;
-            line-height: 1.4;
         }
 
         .arbitrage-meta {
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
-            align-items: center;
             font-size: 0.85rem;
             color: var(--text-secondary);
         }
@@ -445,63 +399,47 @@
         .risk-medium { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
         .risk-high { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 
-        /* Buy/Sell Comparison */
         .buy-sell-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 0;
         }
 
-        .listing-card {
+        .listing-side {
             padding: 1.5rem;
-            position: relative;
         }
 
-        .listing-card.buy-listing {
+        .buy-side {
             border-right: 1px solid var(--border);
             background: rgba(16, 185, 129, 0.05);
         }
 
-        .listing-card.sell-listing {
+        .sell-side {
             background: rgba(102, 126, 234, 0.05);
         }
 
-        .listing-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .listing-type {
+        .side-header {
             font-size: 0.8rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 0.25rem 0.75rem;
             border-radius: 12px;
+            margin-bottom: 1rem;
+            text-align: center;
         }
 
-        .buy-type {
+        .buy-header {
             background: rgba(16, 185, 129, 0.2);
             color: var(--success);
         }
 
-        .sell-type {
+        .sell-header {
             background: rgba(102, 126, 234, 0.2);
             color: var(--primary);
         }
 
-        .listing-image {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-            background: var(--bg-tertiary);
-        }
-
         .listing-info {
-            flex: 1;
+            margin-bottom: 1rem;
         }
 
         .listing-title {
@@ -509,13 +447,12 @@
             font-weight: 500;
             margin-bottom: 0.5rem;
             line-height: 1.3;
-            color: var(--text-primary);
         }
 
         .listing-price {
             font-size: 1.25rem;
             font-weight: 700;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
         }
 
         .buy-price { color: var(--success); }
@@ -524,23 +461,27 @@
         .listing-details {
             font-size: 0.8rem;
             color: var(--text-secondary);
-            line-height: 1.4;
+            margin-bottom: 1rem;
         }
 
-        .listing-actions {
-            margin-top: 1rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .btn-small {
+        .listing-link {
+            display: inline-block;
             padding: 0.5rem 1rem;
-            font-size: 0.8rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
             border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
 
-        /* Profit Analysis */
-        .profit-analysis {
+        .listing-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .profit-section {
             padding: 1.5rem;
             background: rgba(255, 255, 255, 0.02);
             border-top: 1px solid var(--border);
@@ -553,12 +494,12 @@
             margin-bottom: 1rem;
         }
 
-        .profit-metric {
+        .profit-item {
             text-align: center;
         }
 
         .profit-value {
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             font-weight: 700;
             margin-bottom: 0.25rem;
         }
@@ -567,23 +508,10 @@
             font-size: 0.75rem;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
         }
 
         .profit-positive { color: var(--success); }
         .profit-warning { color: var(--warning); }
-
-        .confidence-bar-container {
-            margin-top: 1rem;
-        }
-
-        .confidence-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            font-size: 0.85rem;
-        }
 
         .confidence-bar {
             height: 8px;
@@ -599,7 +527,6 @@
             transition: width 0.3s ease;
         }
 
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -623,48 +550,6 @@
             margin-bottom: 2rem;
         }
 
-        /* Stats Bar */
-        .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .stat-card {
-            background: var(--surface);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow);
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 0.9rem;
-        }
-
-        /* Notification */
         .notification {
             position: fixed;
             top: 20px;
@@ -676,13 +561,17 @@
             font-weight: 500;
             box-shadow: var(--shadow);
             z-index: 1000;
-            backdrop-filter: blur(10px);
             animation: slideInRight 0.3s ease-out;
         }
 
         @keyframes slideInRight {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
         }
 
         .notification-success {
@@ -718,16 +607,11 @@
                 font-size: 2.5rem;
             }
             
-            .stats-bar {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1rem;
-            }
-            
             .buy-sell-grid {
                 grid-template-columns: 1fr;
             }
             
-            .listing-card.buy-listing {
+            .buy-side {
                 border-right: none;
                 border-bottom: 1px solid var(--border);
             }
@@ -735,57 +619,21 @@
             .profit-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
-        }
-
-        /* Utility Classes */
-        .fade-in {
-            animation: fadeIn 0.6s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .slide-in {
-            animation: slideIn 0.4s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            
+            .quick-categories {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="bg-animation"></div>
-    
     <div class="container">
         <!-- Header -->
         <header class="header">
             <h1 class="logo">🦅 FlipHawk</h1>
-            <p class="tagline">AI-Powered Arbitrage Scanner • Find Real Price Differences on eBay</p>
+            <p class="tagline">Real-Time eBay Arbitrage Scanner</p>
+            <div class="status-badge">✅ Keywords Only - No Categories Required</div>
         </header>
-
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-value" id="totalScans">0</div>
-                <div class="stat-label">Total Scans</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="profitableItems">0</div>
-                <div class="stat-label">Arbitrage Found</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avgProfit">$0</div>
-                <div class="stat-label">Avg Net Profit</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="successRate">0%</div>
-                <div class="stat-label">Success Rate</div>
-            </div>
-        </div>
 
         <!-- Main Content Grid -->
         <div class="main-grid">
@@ -796,7 +644,29 @@
                 <form id="scanForm">
                     <div class="form-group">
                         <label class="form-label">🔍 Search Keywords</label>
-                        <input type="text" class="form-input" id="keywords" placeholder="e.g., airpods pro, pokemon cards, nintendo switch" required>
+                        <input type="text" class="form-input" id="keywords" placeholder="e.g., airpods pro, nintendo switch, pokemon cards" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">🚀 Quick Fill (Optional)</label>
+                        <div class="quick-categories">
+                            <div class="category-btn" onclick="fillKeywords('gaming')">
+                                <span class="category-icon">🎮</span>
+                                <span class="category-name">Gaming</span>
+                            </div>
+                            <div class="category-btn" onclick="fillKeywords('tech')">
+                                <span class="category-icon">💻</span>
+                                <span class="category-name">Tech</span>
+                            </div>
+                            <div class="category-btn" onclick="fillKeywords('pokemon')">
+                                <span class="category-icon">🃏</span>
+                                <span class="category-name">Pokemon</span>
+                            </div>
+                            <div class="category-btn" onclick="fillKeywords('sneakers')">
+                                <span class="category-icon">👟</span>
+                                <span class="category-name">Sneakers</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -805,7 +675,7 @@
                                 <span class="form-label">💰 Min Net Profit</span>
                                 <span class="range-value" id="minProfitValue">$15</span>
                             </div>
-                            <input type="range" class="range-slider" id="minProfit" min="5" max="200" value="15" step="5">
+                            <input type="range" class="range-slider" id="minProfit" min="5" max="100" value="15" step="5">
                         </div>
                     </div>
 
@@ -815,22 +685,22 @@
                                 <span class="form-label">📊 Max Results</span>
                                 <span class="range-value" id="maxResultsValue">10</span>
                             </div>
-                            <input type="range" class="range-slider" id="maxResults" min="5" max="50" value="10" step="5">
+                            <input type="range" class="range-slider" id="maxResults" min="5" max="25" value="10" step="5">
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-scan" id="scanBtn">
-                        <span id="scanText">🚀 Start Arbitrage Scan</span>
+                    <button type="submit" class="btn btn-primary" id="scanBtn">
+                        <span id="scanText">🚀 Find Arbitrage</span>
                         <div id="scanSpinner" class="spinner" style="display: none;"></div>
                     </button>
                 </form>
 
                 <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
-                    <button class="btn btn-secondary" style="width: 100%; margin-bottom: 1rem;" onclick="runQuickScan()">
-                        ⚡ Quick Scan
+                    <button class="btn btn-secondary" onclick="runQuickScan()">
+                        ⚡ Quick Scan (AirPods)
                     </button>
-                    <button class="btn btn-secondary" style="width: 100%;" onclick="runTrendingScan()">
-                        📈 Trending Scan
+                    <button class="btn btn-secondary" onclick="runTrendingScan()">
+                        📈 Trending Scan (Switch)
                     </button>
                 </div>
             </div>
@@ -840,7 +710,7 @@
                 <div class="results-header">
                     <h2 class="results-title">💎 Arbitrage Opportunities</h2>
                     <div class="results-stats" id="resultsStats">
-                        <span>Ready to scan</span>
+                        <span>Ready to scan for real arbitrage</span>
                     </div>
                 </div>
 
@@ -848,9 +718,9 @@
                     <div class="empty-state">
                         <div class="empty-icon">🎯</div>
                         <h3 class="empty-title">Ready to Find Real Arbitrage</h3>
-                        <p class="empty-text">Enter keywords to discover actual price differences between identical products on eBay. Our scanner finds buy-low, sell-high opportunities with real profit calculations.</p>
-                        <button class="btn btn-primary" onclick="document.getElementById('scanForm').requestSubmit();">
-                            🚀 Start Your First Scan
+                        <p class="empty-text">Type keywords in the search box (like "airpods pro" or "nintendo switch") or click a quick fill button, then hit "Find Arbitrage" to discover real price differences on eBay.</p>
+                        <button class="btn btn-primary" onclick="fillKeywords('airpods pro'); document.getElementById('scanForm').requestSubmit();">
+                            🚀 Try "AirPods Pro"
                         </button>
                     </div>
                 </div>
@@ -861,31 +731,53 @@
     <script>
         // Global state
         let isScanning = false;
-        let totalScans = 0;
-        let totalArbitrageFound = 0;
-        let totalNetProfit = 0;
 
-        // Initialize the interface
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
-            loadStoredStats();
         });
 
         function setupEventListeners() {
             // Range sliders
-            const minProfitSlider = document.getElementById('minProfit');
-            const maxResultsSlider = document.getElementById('maxResults');
-            
-            minProfitSlider.addEventListener('input', function() {
+            document.getElementById('minProfit').addEventListener('input', function() {
                 document.getElementById('minProfitValue').textContent = `${this.value}`;
             });
             
-            maxResultsSlider.addEventListener('input', function() {
+            document.getElementById('maxResults').addEventListener('input', function() {
                 document.getElementById('maxResultsValue').textContent = this.value;
             });
 
             // Form submission
             document.getElementById('scanForm').addEventListener('submit', handleScan);
+            
+            // Enter key
+            document.getElementById('keywords').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !isScanning) {
+                    handleScan(e);
+                }
+            });
+        }
+
+        // Fill keywords function for category buttons
+        function fillKeywords(type) {
+            const keywordMap = {
+                'gaming': 'gaming',
+                'tech': 'tech',
+                'pokemon': 'pokemon',
+                'sneakers': 'sneakers'
+            };
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active class to clicked button
+            event.target.closest('.category-btn').classList.add('active');
+            
+            // Fill the input
+            document.getElementById('keywords').value = keywordMap[type] || type;
+            document.getElementById('keywords').focus();
         }
 
         async function handleScan(event) {
@@ -893,47 +785,46 @@
             
             if (isScanning) return;
             
-            const formData = {
-                keywords: document.getElementById('keywords').value.trim(),
-                categories: ['General'], // No preset categories
-                min_profit: parseFloat(document.getElementById('minProfit').value),
-                max_results: parseInt(document.getElementById('maxResults').value)
-            };
-
-            if (!formData.keywords) {
+            const keywords = document.getElementById('keywords').value.trim();
+            
+            if (!keywords) {
                 showNotification('Please enter search keywords', 'error');
                 return;
             }
 
-            await startScan(formData);
+            const scanData = {
+                keywords: keywords,  // Simple - just send keywords
+                min_profit: parseFloat(document.getElementById('minProfit').value),
+                limit: parseInt(document.getElementById('maxResults').value)
+            };
+
+            await startScan(scanData);
         }
 
         async function runQuickScan() {
-            const quickScanData = {
-                keywords: 'airpods pro, nintendo switch, pokemon cards',
-                categories: ['General'],
+            document.getElementById('keywords').value = 'airpods pro';
+            const scanData = {
+                keywords: 'airpods pro',
                 min_profit: 20.0,
-                max_results: 10
+                limit: 10
             };
-
-            await startScan(quickScanData);
+            await startScan(scanData);
         }
 
         async function runTrendingScan() {
-            const trendingScanData = {
-                keywords: 'viral tiktok products, trending 2025, supreme, jordan sneakers',
-                categories: ['General'],
+            document.getElementById('keywords').value = 'nintendo switch oled';
+            const scanData = {
+                keywords: 'nintendo switch oled',
                 min_profit: 25.0,
-                max_results: 15
+                limit: 15
             };
-
-            await startScan(trendingScanData);
+            await startScan(scanData);
         }
 
         async function startScan(scanData) {
             isScanning = true;
             updateScanButton(true);
-            showNotification('Starting comprehensive arbitrage scan...', 'info');
+            showNotification(`Scanning eBay for "${scanData.keywords}"...`, 'info');
 
             try {
                 const response = await fetch('/api/scan', {
@@ -948,9 +839,8 @@
 
                 if (result.status === 'success') {
                     displayResults(result.data);
-                    updateStats(result.data);
-                    const count = result.data.opportunities_summary.total_opportunities;
-                    showNotification(`Found ${count} real arbitrage opportunities with verified price differences!`, 'success');
+                    const count = result.data.opportunities_summary?.total_opportunities || 0;
+                    showNotification(`Found ${count} real arbitrage opportunities!`, 'success');
                 } else {
                     throw new Error(result.message || 'Scan failed');
                 }
@@ -987,31 +877,29 @@
             const stats = document.getElementById('resultsStats');
             
             // Update stats
+            const metadata = data.scan_metadata || {};
             stats.innerHTML = `
-                <span>⏱️ ${data.scan_metadata.duration_seconds}s</span>
-                <span>🔍 ${data.scan_metadata.total_searches_performed} searches</span>
-                <span>📊 ${data.scan_metadata.scan_efficiency}% efficiency</span>
-                <span>🎯 ${data.scan_metadata.unique_products_found} unique products</span>
+                <span>⏱️ ${metadata.duration_seconds || 0}s</span>
+                <span>🔍 ${metadata.total_listings_analyzed || 0} listings</span>
+                <span>💎 ${metadata.arbitrage_opportunities_found || 0} opportunities</span>
             `;
 
-            // Display arbitrage opportunities
-            if (data.top_opportunities && data.top_opportunities.length > 0) {
+            // Display opportunities
+            const opportunities = data.top_opportunities || [];
+            if (opportunities.length > 0) {
                 container.innerHTML = `
-                    <div class="product-grid">
-                        ${data.top_opportunities.map(opportunity => createArbitrageCard(opportunity)).join('')}
+                    <div class="arbitrage-grid">
+                        ${opportunities.map(createArbitrageCard).join('')}
                     </div>
                 `;
-                
-                // Add fade-in animation
-                container.classList.add('fade-in');
             } else {
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">😔</div>
-                        <h3 class="empty-title">No Arbitrage Opportunities Found</h3>
-                        <p class="empty-text">Try different keywords, lower the minimum profit threshold, or check more popular items. Remember, we need at least 2 listings of the same product at different prices.</p>
+                        <h3 class="empty-title">No Arbitrage Found</h3>
+                        <p class="empty-text">Try different keywords or lower the minimum profit. Real arbitrage opportunities are rare but profitable!</p>
                         <button class="btn btn-secondary" onclick="document.getElementById('minProfit').value=5; document.getElementById('minProfitValue').textContent='$5';">
-                            📉 Lower Min Profit to $5
+                            📉 Lower Profit to $5
                         </button>
                     </div>
                 `;
@@ -1019,104 +907,76 @@
         }
 
         function createArbitrageCard(opportunity) {
-            const riskClass = `risk-${opportunity.risk_level.toLowerCase()}`;
-            const confidenceWidth = Math.max(opportunity.confidence_score, 10);
+            const riskClass = `risk-${opportunity.risk_level?.toLowerCase() || 'low'}`;
+            const confidence = opportunity.confidence_score || 50;
             
             return `
-                <div class="arbitrage-card slide-in">
+                <div class="arbitrage-card">
                     <div class="arbitrage-header">
-                        <h3 class="arbitrage-title">${truncateTitle(opportunity.buy_listing.title, 80)}</h3>
+                        <h3 class="arbitrage-title">${truncateTitle(opportunity.buy_listing?.title || 'Product', 80)}</h3>
                         <div class="arbitrage-meta">
-                            <span class="meta-badge ${riskClass}">${opportunity.risk_level} Risk</span>
-                            <span>Similarity: ${(opportunity.similarity_score * 100).toFixed(1)}%</span>
-                            <span>ID: ${opportunity.opportunity_id}</span>
+                            <span class="meta-badge ${riskClass}">${opportunity.risk_level || 'LOW'} Risk</span>
+                            <span>Confidence: ${confidence}%</span>
+                            <span>Match: ${((opportunity.similarity_score || 0.8) * 100).toFixed(0)}%</span>
                         </div>
                     </div>
                     
                     <div class="buy-sell-grid">
-                        <!-- Buy Listing (Lower Price) -->
-                        <div class="listing-card buy-listing">
-                            <div class="listing-header">
-                                <span class="listing-type buy-type">🛒 BUY LOW</span>
-                            </div>
-                            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                                <img src="${opportunity.buy_listing.image_url || 'https://via.placeholder.com/60x60/334155/cbd5e1?text=No+Image'}" 
-                                     alt="Product" class="listing-image" onerror="this.src='https://via.placeholder.com/60x60/334155/cbd5e1?text=No+Image'">
-                                <div class="listing-info">
-                                    <div class="listing-title">${truncateTitle(opportunity.buy_listing.title, 50)}</div>
-                                    <div class="listing-price buy-price">${opportunity.buy_listing.total_cost.toFixed(2)}</div>
-                                </div>
+                        <div class="listing-side buy-side">
+                            <div class="side-header buy-header">🛒 BUY LOW</div>
+                            <div class="listing-info">
+                                <div class="listing-title">${truncateTitle(opportunity.buy_listing?.title || '', 60)}</div>
+                                <div class="listing-price buy-price">${(opportunity.buy_listing?.total_cost || 0).toFixed(2)}</div>
                             </div>
                             <div class="listing-details">
-                                <div><strong>Price:</strong> ${opportunity.buy_listing.price.toFixed(2)}</div>
-                                <div><strong>Shipping:</strong> ${opportunity.buy_listing.shipping_cost.toFixed(2)}</div>
-                                <div><strong>Condition:</strong> ${opportunity.buy_listing.condition}</div>
-                                <div><strong>Seller:</strong> ${opportunity.buy_listing.seller_rating} (${opportunity.buy_listing.seller_feedback})</div>
-                                <div><strong>Location:</strong> ${opportunity.buy_listing.location}</div>
+                                <div>Price: ${(opportunity.buy_listing?.price || 0).toFixed(2)}</div>
+                                <div>Shipping: ${(opportunity.buy_listing?.shipping_cost || 0).toFixed(2)}</div>
+                                <div>Condition: ${opportunity.buy_listing?.condition || 'Unknown'}</div>
                             </div>
-                            <div class="listing-actions">
-                                <a href="${opportunity.buy_listing.ebay_link}" target="_blank" class="btn btn-primary btn-small">
-                                    🛒 View Buy Listing
-                                </a>
-                            </div>
+                            <a href="${opportunity.buy_listing?.ebay_link || '#'}" target="_blank" class="listing-link">
+                                🛒 View Buy Listing
+                            </a>
                         </div>
                         
-                        <!-- Sell Reference (Higher Price) -->
-                        <div class="listing-card sell-listing">
-                            <div class="listing-header">
-                                <span class="listing-type sell-type">💰 SELL HIGH</span>
-                            </div>
-                            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                                <img src="${opportunity.sell_reference.image_url || 'https://via.placeholder.com/60x60/334155/cbd5e1?text=No+Image'}" 
-                                     alt="Product" class="listing-image" onerror="this.src='https://via.placeholder.com/60x60/334155/cbd5e1?text=No+Image'">
-                                <div class="listing-info">
-                                    <div class="listing-title">${truncateTitle(opportunity.sell_reference.title, 50)}</div>
-                                    <div class="listing-price sell-price">${opportunity.sell_reference.price.toFixed(2)}</div>
-                                </div>
+                        <div class="listing-side sell-side">
+                            <div class="side-header sell-header">💰 SELL HIGH</div>
+                            <div class="listing-info">
+                                <div class="listing-title">${truncateTitle(opportunity.sell_reference?.title || '', 60)}</div>
+                                <div class="listing-price sell-price">${(opportunity.sell_reference?.price || 0).toFixed(2)}</div>
                             </div>
                             <div class="listing-details">
-                                <div><strong>Price:</strong> ${opportunity.sell_reference.price.toFixed(2)}</div>
-                                <div><strong>Shipping:</strong> ${opportunity.sell_reference.shipping_cost.toFixed(2)}</div>
-                                <div><strong>Condition:</strong> ${opportunity.sell_reference.condition}</div>
-                                <div><strong>Seller:</strong> ${opportunity.sell_reference.seller_rating} (${opportunity.sell_reference.seller_feedback})</div>
-                                <div><strong>Location:</strong> ${opportunity.sell_reference.location}</div>
+                                <div>Price: ${(opportunity.sell_reference?.price || 0).toFixed(2)}</div>
+                                <div>Shipping: ${(opportunity.sell_reference?.shipping_cost || 0).toFixed(2)}</div>
+                                <div>Condition: ${opportunity.sell_reference?.condition || 'Unknown'}</div>
                             </div>
-                            <div class="listing-actions">
-                                <a href="${opportunity.sell_reference.ebay_link}" target="_blank" class="btn btn-secondary btn-small">
-                                    📊 View Sell Reference
-                                </a>
-                            </div>
+                            <a href="${opportunity.sell_reference?.ebay_link || '#'}" target="_blank" class="listing-link">
+                                📊 View Sell Reference
+                            </a>
                         </div>
                     </div>
                     
-                    <div class="profit-analysis">
+                    <div class="profit-section">
                         <div class="profit-grid">
-                            <div class="profit-metric">
-                                <div class="profit-value profit-positive">${opportunity.gross_profit.toFixed(2)}</div>
+                            <div class="profit-item">
+                                <div class="profit-value profit-positive">${(opportunity.gross_profit || 0).toFixed(2)}</div>
                                 <div class="profit-label">Gross Profit</div>
                             </div>
-                            <div class="profit-metric">
-                                <div class="profit-value profit-positive">${opportunity.net_profit_after_fees.toFixed(2)}</div>
+                            <div class="profit-item">
+                                <div class="profit-value profit-positive">${(opportunity.net_profit_after_fees || 0).toFixed(2)}</div>
                                 <div class="profit-label">Net Profit</div>
                             </div>
-                            <div class="profit-metric">
-                                <div class="profit-value ${opportunity.roi_percentage >= 50 ? 'profit-positive' : 'profit-warning'}">${opportunity.roi_percentage.toFixed(1)}%</div>
+                            <div class="profit-item">
+                                <div class="profit-value ${(opportunity.roi_percentage || 0) >= 50 ? 'profit-positive' : 'profit-warning'}">${(opportunity.roi_percentage || 0).toFixed(1)}%</div>
                                 <div class="profit-label">ROI</div>
                             </div>
-                            <div class="profit-metric">
-                                <div class="profit-value profit-warning">${opportunity.estimated_fees.toFixed(2)}</div>
+                            <div class="profit-item">
+                                <div class="profit-value profit-warning">${(opportunity.estimated_fees || 0).toFixed(2)}</div>
                                 <div class="profit-label">Est. Fees</div>
                             </div>
                         </div>
                         
-                        <div class="confidence-bar-container">
-                            <div class="confidence-label">
-                                <span>Confidence Score</span>
-                                <span style="font-weight: 600; color: var(--primary);">${opportunity.confidence_score}%</span>
-                            </div>
-                            <div class="confidence-bar">
-                                <div class="confidence-fill" style="width: ${confidenceWidth}%"></div>
-                            </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${Math.max(confidence, 10)}%"></div>
                         </div>
                     </div>
                 </div>
@@ -1124,39 +984,8 @@
         }
 
         function truncateTitle(title, maxLength = 60) {
+            if (!title) return 'No Title';
             return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
-        }
-
-        function updateStats(data) {
-            totalScans++;
-            totalArbitrageFound += data.opportunities_summary.total_opportunities;
-            totalNetProfit += data.opportunities_summary.total_opportunities * data.opportunities_summary.average_profit_after_fees;
-            
-            document.getElementById('totalScans').textContent = totalScans;
-            document.getElementById('profitableItems').textContent = totalArbitrageFound;
-            document.getElementById('avgProfit').textContent = `${(totalNetProfit / Math.max(totalArbitrageFound, 1)).toFixed(0)}`;
-            document.getElementById('successRate').textContent = `${data.scan_metadata.scan_efficiency}%`;
-            
-            // Store stats
-            localStorage.setItem('flipHawkStats', JSON.stringify({
-                totalScans,
-                totalArbitrageFound,
-                totalNetProfit
-            }));
-        }
-
-        function loadStoredStats() {
-            const stored = localStorage.getItem('flipHawkStats');
-            if (stored) {
-                const stats = JSON.parse(stored);
-                totalScans = stats.totalScans || 0;
-                totalArbitrageFound = stats.totalArbitrageFound || 0;
-                totalNetProfit = stats.totalNetProfit || 0;
-                
-                document.getElementById('totalScans').textContent = totalScans;
-                document.getElementById('profitableItems').textContent = totalArbitrageFound;
-                document.getElementById('avgProfit').textContent = `${(totalNetProfit / Math.max(totalArbitrageFound, 1)).toFixed(0)}`;
-            }
         }
 
         function displayError() {
@@ -1165,7 +994,7 @@
                 <div class="empty-state">
                     <div class="empty-icon">⚠️</div>
                     <h3 class="empty-title">Scan Failed</h3>
-                    <p class="empty-text">There was an error processing your request. This could be due to network issues or eBay rate limiting. Please try again with different keywords.</p>
+                    <p class="empty-text">There was an error. This could be network issues or eBay blocking requests. Try different keywords.</p>
                     <button class="btn btn-primary" onclick="runQuickScan();">
                         🔄 Try Quick Scan
                     </button>
@@ -1183,17 +1012,12 @@
             setTimeout(() => {
                 notification.style.animation = 'slideOutRight 0.3s ease-in';
                 setTimeout(() => {
-                    document.body.removeChild(notification);
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
                 }, 300);
             }, 4000);
         }
-
-        // Allow Enter key to trigger scan
-        document.getElementById('keywords').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                handleScan(e);
-            }
-        });
     </script>
 </body>
 </html>
