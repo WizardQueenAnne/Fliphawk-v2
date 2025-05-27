@@ -74,12 +74,23 @@ def scan_arbitrage():
         
         request_data = request.get_json() or {}
         
+        # Handle multiple possible keyword fields
         keyword = request_data.get('keyword', '').strip()
         keywords = request_data.get('keywords', '').strip()
-        
-        # Use either keyword or keywords
         search_term = keyword or keywords
         
+        # If no direct keyword, check if category data is provided
+        if not search_term:
+            category = request_data.get('category', '').strip()
+            subcategory = request_data.get('subcategory', '').strip()
+            
+            # Use category as search term if provided
+            if category:
+                search_term = category
+            elif subcategory:
+                search_term = subcategory
+        
+        # Final validation
         if not search_term:
             return jsonify({
                 'status': 'error',
@@ -139,11 +150,23 @@ def search_ebay_listings():
         
         request_data = request.get_json() or {}
         
+        # Handle multiple possible keyword fields
         keyword = request_data.get('keyword', '').strip()
         keywords = request_data.get('keywords', '').strip()
-        
         search_term = keyword or keywords
         
+        # If no direct keyword, check if category data is provided
+        if not search_term:
+            category = request_data.get('category', '').strip()
+            subcategory = request_data.get('subcategory', '').strip()
+            
+            # Use category as search term if provided
+            if category:
+                search_term = category
+            elif subcategory:
+                search_term = subcategory
+        
+        # Final validation
         if not search_term:
             return jsonify({
                 'status': 'error',
