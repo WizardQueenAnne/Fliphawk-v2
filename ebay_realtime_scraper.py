@@ -665,5 +665,130 @@ def test_scraper():
         print(f"❌ Test failed: {e}")
         return False
 
+# ADD THESE FUNCTIONS TO YOUR ebay_realtime_scraper.py FILE
+# These are the exact functions your Flask app expects to import
+
+def search_ebay_real(keyword: str, limit: int = 50, sort: str = "price") -> List[Dict]:
+    """Main function to search eBay for real listings - REQUIRED BY FLASK APP"""
+    try:
+        # Use your existing scraper class
+        scraper = RealTimeeBayScraper()  # or whatever your class is called
+        listings = scraper.search_ebay(keyword, limit, sort)
+        return [asdict(listing) for listing in listings]
+    except Exception as e:
+        logger.error(f"Real eBay search failed: {e}")
+        return []
+
+def find_arbitrage_real(keyword: str, min_profit: float = 15.0, limit: int = 50) -> Dict:
+    """Find real arbitrage opportunities - REQUIRED BY FLASK APP"""
+    try:
+        start_time = datetime.now()
+        
+        # Use your existing scraper class
+        scraper = RealTimeeBayScraper()  # or whatever your class is called
+        listings = scraper.search_ebay(keyword, limit, "price")
+        
+        # Use existing arbitrage detection (or enhanced if you added it)
+        if hasattr(scraper, 'find_arbitrage_opportunities'):
+            opportunities = scraper.find_arbitrage_opportunities(listings, min_profit)
+        else:
+            # Fallback to simple comparison
+            opportunities = simple_arbitrage_finder(listings, min_profit)
+        
+        # Calculate summary
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        total_opportunities = len(opportunities)
+        avg_profit = sum(opp.get('net_profit_after_fees', 0) for opp in opportunities) / max(total_opportunities, 1)
+        highest_profit = max([opp.get('net_profit_after_fees', 0) for opp in opportunities], default=0)
+        avg_roi = sum(opp.get('roi_percentage', 0) for opp in opportunities) / max(total_opportunities, 1)
+        
+        return {
+            'scan_metadata': {
+                'scan_id': f"REAL_{int(time.time())}",
+                'timestamp': end_time.isoformat(),
+                'duration_seconds': round(duration, 2),
+                'total_searches_performed': 1,
+                'total_listings_analyzed': len(listings),
+                'arbitrage_opportunities_found': total_opportunities,
+                'scan_efficiency': round((total_opportunities / max(len(listings), 1)) * 100, 2),
+                'keywords_used': [keyword],
+                'unique_products_found': len(listings)
+            },
+            'opportunities_summary': {
+                'total_opportunities': total_opportunities,
+                'average_profit_after_fees': round(avg_profit, 2),
+                'average_roi': round(avg_roi, 1),
+                'highest_profit': round(highest_profit, 2),
+                'risk_distribution': {
+                    'low': len([opp for opp in opportunities if opp.get('risk_level') == 'LOW']),
+                    'medium': len([opp for opp in opportunities if opp.get('risk_level') == 'MEDIUM']),
+                    'high': len([opp for opp in opportunities if opp.get('risk_level') == 'HIGH'])
+                }
+            },
+            'top_opportunities': opportunities
+        }
+        
+    except Exception as e:
+        logger.error(f"Arbitrage analysis failed: {e}")
+        return {
+            'scan_metadata': {'error': str(e)},
+            'opportunities_summary': {'total_opportunities': 0},
+            'top_opportunities': []
+        }
+
+def simple_arbitrage_finder(listings: List, min_profit: float) -> List[Dict]:
+    """Simple fallback arbitrage finder"""
+    opportunities = []
+    
+    for i, buy_listing in enumerate(listings):
+        for j, sell_listing in enumerate(listings):
+            if i >= j:
+                continue
+                
+            try:
+                buy_cost = buy_listing.get('total_cost', 0) if isinstance(buy_listing, dict) else buy_listing.total_cost
+                sell_price = sell_listing.get('price', 0) if isinstance(sell_listing, dict) else sell_listing.price
+                
+                if sell_price > buy_cost:
+                    gross_profit = sell_price - buy_cost
+                    fees = sell_price * 0.15  # Simple 15% fee
+                    net_profit = gross_profit - fees
+                    
+                    if net_profit >= min_profit:
+                        # Convert to dict if needed
+                        buy_dict = buy_listing if isinstance(buy_listing, dict) else asdict(buy_listing)
+                        sell_dict = sell_listing if isinstance(sell_listing, dict) else asdict(sell_listing)
+                        
+                        opportunity = {
+                            'opportunity_id': f"SIMPLE_{int(time.time())}_{random.randint(1000, 9999)}",
+                            'buy_listing': buy_dict,
+                            'sell_reference': sell_dict,
+                            'similarity_score': 0.8,  # Default similarity
+                            'confidence_score': 70,
+                            'risk_level': 'MEDIUM',
+                            'gross_profit': round(gross_profit, 2),
+                            'net_profit_after_fees': round(net_profit, 2),
+                            'roi_percentage': round((net_profit / buy_cost) * 100, 1),
+                            'estimated_fees': round(fees, 2),
+                            'created_at': datetime.now().isoformat()
+                        }
+                        opportunities.append(opportunity)
+                        
+            except Exception as e:
+                logger.error(f"Error creating opportunity: {e}")
+                continue
+    
+    return opportunities[:20]  # Return top 20
+
+# Make sure you have a global scraper instance
+try:
+    scraper = RealTimeeBayScraper()
+    print("✅ Global scraper instance created")
+except Exception as e:
+    print(f"❌ Failed to create scraper instance: {e}")
+    scraper = None
+
 if __name__ == "__main__":
     test_scraper()
