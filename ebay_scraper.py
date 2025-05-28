@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FlipHawk Real-Time eBay Scraper - ENHANCED VERSION
-Fixes duplicate opportunities and improves detection across all categories
+FlipHawk Real-Time eBay Scraper
+NO DUMMY DATA - REAL eBay listings only through web scraping
 """
 
 import requests
@@ -11,12 +11,10 @@ import re
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 from bs4 import BeautifulSoup
 import random
 from dataclasses import dataclass, asdict
-from difflib import SequenceMatcher
-from collections import defaultdict
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -44,693 +42,641 @@ class eBayListing:
     is_auction: bool
     buy_it_now_available: bool
 
-class EnhancedArbitrageDetector:
-    """Enhanced arbitrage detection with better duplicate handling"""
+class RealTimeeBayScraper:
+    """Real-time eBay scraper using web scraping (no API needed)"""
     
     def __init__(self):
-        self.seen_opportunities = set()
-        self.title_cache = {}
-    
-    def normalize_title(self, title: str) -> str:
-        """Normalize title for better comparison"""
-        if title in self.title_cache:
-            return self.title_cache[title]
+        self.base_url = "https://www.ebay.com"
+        self.search_url = f"{self.base_url}/sch/i.html"
         
-        normalized = title.lower()
-        
-        # Remove noise words and characters
-        noise_patterns = [
-            r'\b(new|used|pre-owned|refurbished|open box|sealed|brand new)\b',
-            r'\b(free shipping|fast shipping|ship.*free)\b',
-            r'\b(authentic|genuine|original)\b',
-            r'[^\w\s]',
-            r'\s+',
+        # Rotate user agents to avoid detection
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
         ]
         
-        for pattern in noise_patterns:
-            normalized = re.sub(pattern, ' ', normalized)
-        
-        normalized = normalized.strip()
-        key_words = self.extract_key_words(normalized)
-        normalized_key = ' '.join(sorted(key_words))
-        
-        self.title_cache[title] = normalized_key
-        return normalized_key
-    
-    def extract_key_words(self, title: str) -> List[str]:
-        """Extract key identifying words from title"""
-        important_patterns = [
-            r'\b(iphone|ipad|macbook|airpods|apple|samsung|galaxy|pixel)\b',
-            r'\b(ps[45]|xbox|nintendo|switch|pokemon|mario|zelda)\b',
-            r'\b(rtx|gtx|nvidia|amd|radeon)\b',
-            r'\b(pro|max|ultra|plus|mini|air|se|oled)\b',
-            r'\b(\d+gb|\d+tb|\d+inch|\d+")\b',
-            r'\b(charizard|pikachu|magic|mtg|jordan|yeezy)\b',
-        ]
-        
-        words = title.split()
-        key_words = []
-        
-        for word in words:
-            for pattern in important_patterns:
-                if re.search(pattern, word):
-                    key_words.append(word)
-                    break
-            else:
-                if len(word) > 3 and word not in {'with', 'from', 'this', 'that', 'they', 'were', 'been', 'have'}:
-                    key_words.append(word)
-        
-        return key_words[:8]
-    
-    def calculate_similarity(self, title1: str, title2: str) -> float:
-        """Calculate similarity between two product titles"""
-        norm1 = self.normalize_title(title1)
-        norm2 = self.normalize_title(title2)
-        
-        if not norm1 or not norm2:
-            return 0.0
-        
-        sequence_sim = SequenceMatcher(None, norm1, norm2).ratio()
-        
-        words1 = set(norm1.split())
-        words2 = set(norm2.split())
-        
-        if not words1 or not words2:
-            return sequence_sim
-        
-        word_sim = len(words1.intersection(words2)) / len(words1.union(words2))
-        return (sequence_sim * 0.4 + word_sim * 0.6)
-    
-    def generate_opportunity_id(self, buy_listing: Dict, sell_listing: Dict) -> str:
-        """Generate unique ID for opportunity"""
-        buy_key = f"{buy_listing.get('item_id', '')}-{buy_listing.get('price', 0):.2f}"
-        sell_key = f"{sell_listing.get('item_id', '')}-{sell_listing.get('price', 0):.2f}"
-        return f"{min(buy_key, sell_key)}_{max(buy_key, sell_key)}"
-    
-    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
-        """Enhanced arbitrage detection with duplicate prevention"""
-        
-        logger.info(f"🎯 Enhanced arbitrage analysis: {len(listings)} listings, min profit: ${min_profit}")
-        
-        if len(listings) < 2:
-            logger.warning("❌ Need at least 2 listings for arbitrage")
-            return []
-        
-        # Convert to dict format for processing
-        listing_dicts = [asdict(listing) for listing in listings]
-        
-        # Reset for this scan
-        self.seen_opportunities.clear()
-        opportunities = []
-        
-        # Adjust minimum profit based on listing count
-        adjusted_min_profit = min_profit
-        if len(listings) < 10:
-            adjusted_min_profit = max(min_profit * 0.7, 8.0)
-            logger.info(f"📉 Adjusted min profit to ${adjusted_min_profit:.2f} due to few listings")
-        
-        # Try multiple similarity thresholds
-        similarity_thresholds = [0.6, 0.4, 0.3, 0.25]
-        
-        for threshold in similarity_thresholds:
-            if len(opportunities) >= 15:  # Stop if we have enough
-                break
-                
-            logger.info(f"🔍 Trying similarity threshold: {threshold}")
-            
-            for i, buy_listing in enumerate(listing_dicts):
-                for j, sell_listing in enumerate(listing_dicts):
-                    if i >= j:  # Skip same item and avoid duplicates
-                        continue
-                    
-                    # Calculate similarity
-                    similarity = self.calculate_similarity(
-                        buy_listing.get('title', ''),
-                        sell_listing.get('title', '')
-                    )
-                    
-                    if similarity < threshold:
-                        continue
-                    
-                    # Try both directions (A buy B sell, B buy A sell)
-                    opp1 = self.evaluate_opportunity(buy_listing, sell_listing, adjusted_min_profit, similarity)
-                    opp2 = self.evaluate_opportunity(sell_listing, buy_listing, adjusted_min_profit, similarity)
-                    
-                    for opp in [opp1, opp2]:
-                        if opp:
-                            opp_id = self.generate_opportunity_id(opp['buy_listing'], opp['sell_reference'])
-                            
-                            if opp_id not in self.seen_opportunities:
-                                self.seen_opportunities.add(opp_id)
-                                opportunities.append(opp)
-        
-        # Remove any remaining duplicates and sort
-        unique_opportunities = self.deduplicate_opportunities(opportunities)
-        unique_opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
-        
-        logger.info(f"✅ Found {len(unique_opportunities)} unique opportunities")
-        return unique_opportunities[:25]
-    
-    def evaluate_opportunity(self, buy_listing: Dict, sell_listing: Dict, 
-                           min_profit: float, similarity: float) -> Optional[Dict]:
-        """Evaluate a potential arbitrage opportunity"""
-        
-        buy_cost = buy_listing.get('total_cost', 0)
-        sell_price = sell_listing.get('price', 0)
-        
-        if buy_cost <= 0 or sell_price <= buy_cost:
-            return None
-        
-        # Calculate profits with more realistic fees
-        gross_profit = sell_price - buy_cost
-        
-        if gross_profit < min_profit * 0.8:  # Quick filter
-            return None
-        
-        # Reduced fee structure for more opportunities
-        ebay_fees = sell_price * 0.095  # ~9.5% (reduced from 12.9%)
-        payment_fees = sell_price * 0.025  # 2.5% payment processing
-        shipping_cost = 6.0 if sell_listing.get('shipping_cost', 0) == 0 else 0
-        
-        total_fees = ebay_fees + payment_fees + shipping_cost
-        net_profit = gross_profit - total_fees
-        
-        if net_profit < min_profit:
-            return None
-        
-        roi = (net_profit / buy_cost) * 100 if buy_cost > 0 else 0
-        confidence = self.calculate_confidence(similarity, net_profit, buy_listing, sell_listing)
-        risk_level = self.assess_risk(roi, confidence, buy_listing)
-        
-        return {
-            'opportunity_id': f"ENHANCED_{int(time.time())}_{random.randint(1000, 9999)}",
-            'buy_listing': buy_listing,
-            'sell_reference': sell_listing,
-            'similarity_score': round(similarity, 3),
-            'confidence_score': min(95, max(15, confidence)),
-            'risk_level': risk_level,
-            'gross_profit': round(gross_profit, 2),
-            'net_profit_after_fees': round(net_profit, 2),
-            'roi_percentage': round(roi, 1),
-            'estimated_fees': round(total_fees, 2),
-            'profit_analysis': {
-                'gross_profit': gross_profit,
-                'net_profit_after_fees': net_profit,
-                'roi_percentage': roi,
-                'estimated_fees': total_fees,
-                'fee_breakdown': {
-                    'ebay_fee': ebay_fees,
-                    'payment_fee': payment_fees,
-                    'shipping_cost': shipping_cost
-                }
-            },
-            'created_at': time.time()
-        }
-    
-    def calculate_confidence(self, similarity: float, net_profit: float, 
-                           buy_listing: Dict, sell_listing: Dict) -> int:
-        """Calculate confidence score for opportunity"""
-        
-        confidence = 35  # Base confidence
-        
-        # Similarity bonus
-        if similarity > 0.7:
-            confidence += 35
-        elif similarity > 0.5:
-            confidence += 25
-        elif similarity > 0.3:
-            confidence += 15
-        elif similarity > 0.25:
-            confidence += 8
-        
-        # Profit bonus
-        if net_profit >= 50:
-            confidence += 20
-        elif net_profit >= 30:
-            confidence += 15
-        elif net_profit >= 20:
-            confidence += 10
-        elif net_profit >= 10:
-            confidence += 5
-        
-        # Condition bonus
-        buy_condition = buy_listing.get('condition', '').lower()
-        if any(word in buy_condition for word in ['new', 'mint', 'sealed']):
-            confidence += 12
-        elif any(word in buy_condition for word in ['excellent', 'very good']):
-            confidence += 6
-        
-        # Price range bonus
-        buy_price = buy_listing.get('total_cost', 0)
-        if 15 <= buy_price <= 400:
-            confidence += 8
-        elif 8 <= buy_price <= 800:
-            confidence += 4
-        
-        return confidence
-    
-    def assess_risk(self, roi: float, confidence: int, buy_listing: Dict) -> str:
-        """Assess risk level of opportunity"""
-        
-        risk_factors = 0
-        
-        if roi > 150:
-            risk_factors += 2
-        elif roi > 80:
-            risk_factors += 1
-        
-        if confidence < 45:
-            risk_factors += 2
-        elif confidence < 65:
-            risk_factors += 1
-        
-        buy_price = buy_listing.get('total_cost', 0)
-        if buy_price > 800:
-            risk_factors += 1
-        elif buy_price < 8:
-            risk_factors += 1
-        
-        buy_condition = buy_listing.get('condition', '').lower()
-        if any(word in buy_condition for word in ['used', 'acceptable', 'poor', 'damaged']):
-            risk_factors += 1
-        
-        if risk_factors >= 4:
-            return 'HIGH'
-        elif risk_factors >= 2:
-            return 'MEDIUM'
-        else:
-            return 'LOW'
-    
-    def deduplicate_opportunities(self, opportunities: List[Dict]) -> List[Dict]:
-        """Remove duplicate opportunities"""
-        seen_signatures = set()
-        unique_opportunities = []
-        
-        for opp in opportunities:
-            buy_id = opp['buy_listing'].get('item_id', '')
-            sell_id = opp['sell_reference'].get('item_id', '')
-            profit = opp['net_profit_after_fees']
-            
-            signature = f"{buy_id}_{sell_id}_{profit:.2f}"
-            
-            if signature not in seen_signatures:
-                seen_signatures.add(signature)
-                unique_opportunities.append(opp)
-        
-        return unique_opportunities
-
-
-class EnhancedeBayScraper:
-    """Enhanced eBay scraper with better category coverage"""
-    
-    def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        self.last_request_time = 0
+        self.min_delay = 1.0  # Minimum delay between requests
+        
+        # Track seen items to avoid duplicates
+        self.seen_items = set()
+    
+    def get_headers(self):
+        """Get randomized headers"""
+        return {
+            'User-Agent': random.choice(self.user_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
-        })
-        self.arbitrage_detector = EnhancedArbitrageDetector()
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+        }
     
-    def get_enhanced_search_terms(self, category: str) -> List[str]:
-        """Get enhanced search terms for better category coverage"""
+    def rate_limit(self):
+        """Implement rate limiting"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
         
-        search_terms = {
-            'tech': [
-                'iphone 14', 'iphone 13', 'samsung galaxy s24', 'pixel 8',
-                'macbook air', 'macbook pro', 'gaming laptop', 'dell xps',
-                'airpods pro', 'airpods max', 'sony wh-1000xm5', 'bose qc45',
-                'ipad pro', 'ipad air', 'surface pro', 'galaxy tab',
-                'rtx 4080', 'rtx 4070', 'gtx 1660', 'rx 7700',
-                'ssd 1tb', 'nvme ssd', 'gaming monitor', '4k monitor',
-                'mechanical keyboard', 'gaming mouse', 'webcam 4k',
-                'nintendo switch oled', 'steam deck', 'rog ally'
-            ],
-            'gaming': [
-                'ps5 console', 'ps5 digital', 'ps4 pro', 'ps4 slim',
-                'xbox series x', 'xbox series s', 'xbox one x',
-                'nintendo switch', 'switch oled', 'switch lite',
-                'dualsense controller', 'xbox wireless controller',
-                'call of duty mw3', 'spider-man 2', 'god of war ragnarok',
-                'zelda tears kingdom', 'mario wonder', 'pokemon scarlet',
-                'gaming headset', 'turtle beach', 'steelseries',
-                'razer basilisk', 'logitech g pro', 'corsair k70'
-            ],
-            'collectibles': [
-                'pokemon cards booster', 'charizard vmax', 'pikachu illustrator',
-                'magic the gathering', 'black lotus', 'mox ruby',
-                'yugioh blue eyes', 'first edition base set', 'shadowless',
-                'psa 10 cards', 'bgs 10', 'gem mint',
-                'funko pop chase', 'hot toys', 'marvel legends',
-                'vintage star wars', 'transformers g1', 'gi joe',
-                'coin collection', 'morgan silver dollar', 'peace dollar'
-            ],
-            'fashion': [
-                'air jordan 1', 'jordan 4 black cat', 'jordan 11 bred',
-                'nike dunk low', 'yeezy 350', 'yeezy slides',
-                'supreme box logo', 'off white nike', 'travis scott jordan',
-                'rolex submariner', 'omega speedmaster', 'seiko',
-                'designer handbag', 'louis vuitton', 'gucci bag',
-                'vintage band tee', 'grateful dead shirt', 'nike vintage'
-            ]
+        if time_since_last < self.min_delay:
+            sleep_time = self.min_delay - time_since_last + random.uniform(0.1, 0.5)
+            time.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
+    
+    def build_search_url(self, keyword: str, page: int = 1, sort_order: str = "price") -> str:
+        """Build eBay search URL"""
+        params = {
+            '_nkw': keyword,
+            '_pgn': page,
+            '_ipg': 240,  # Max items per page
+            'LH_BIN': 1,  # Buy It Now only
+            'LH_Complete': 0,  # Active listings only
+            'LH_Sold': 0,  # Not sold
+            'rt': 'nc',   # No category redirect
+            '_sacat': 0,  # All categories
         }
         
-        return search_terms.get(category, [])
+        # Sort options
+        sort_mapping = {
+            'price': 15,    # Price + shipping: lowest first
+            'newest': 10,   # Time: newly listed
+            'ending': 1,    # Time: ending soonest
+            'popular': 12   # Best Match
+        }
+        
+        params['_sop'] = sort_mapping.get(sort_order, 15)
+        
+        query_string = urlencode(params)
+        return f"{self.search_url}?{query_string}"
     
-    def search_ebay_sold_listings(self, search_term: str, max_pages: int = 3) -> List[eBayListing]:
-        """Search eBay sold listings for price reference"""
-        
-        listings = []
-        
-        for page in range(1, max_pages + 1):
+    def get_page(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
+        """Fetch and parse eBay page"""
+        for attempt in range(retries):
             try:
-                params = {
-                    '_nkw': search_term,
-                    '_sacat': '0',
-                    'LH_Sold': '1',
-                    'LH_Complete': '1',
-                    '_pgn': page,
-                    '_ipg': '50',
-                    'rt': 'nc'
-                }
+                self.rate_limit()
                 
-                url = f"https://www.ebay.com/sch/i.html?{urlencode(params)}"
+                headers = self.get_headers()
+                response = self.session.get(url, headers=headers, timeout=15)
                 
-                response = self.session.get(url, timeout=15)
-                response.raise_for_status()
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Verify it's a valid eBay page
+                    if soup.find('title') and 'eBay' in soup.get_text():
+                        return soup
+                    else:
+                        logger.warning(f"Invalid eBay page content")
+                        return None
                 
-                soup = BeautifulSoup(response.content, 'html.parser')
-                items = soup.find_all('div', {'class': 's-item'})
-                
-                for item in items[:15]:  # Limit per page
-                    listing = self.parse_sold_listing(item)
-                    if listing:
-                        listings.append(listing)
-                
-                time.sleep(random.uniform(1.5, 3.0))
-                
+                elif response.status_code == 429:
+                    wait_time = (2 ** attempt) + random.uniform(5, 15)
+                    logger.warning(f"Rate limited, waiting {wait_time:.1f}s...")
+                    time.sleep(wait_time)
+                    
+                else:
+                    logger.warning(f"HTTP {response.status_code} for {url}")
+                    if attempt < retries - 1:
+                        time.sleep(random.uniform(2, 5))
+                        
             except Exception as e:
-                logger.error(f"Error searching sold listings for '{search_term}' page {page}: {e}")
-                continue
+                logger.error(f"Error fetching page (attempt {attempt + 1}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(random.uniform(3, 8))
         
-        logger.info(f"Found {len(listings)} sold listings for '{search_term}'")
-        return listings
+        return None
     
-    def search_ebay_active_listings(self, search_term: str, max_pages: int = 4) -> List[eBayListing]:
-        """Search eBay active listings for buying opportunities"""
-        
-        listings = []
-        
-        for page in range(1, max_pages + 1):
-            try:
-                params = {
-                    '_nkw': search_term,
-                    '_sacat': '0',
-                    'LH_BIN': '1',  # Buy It Now only
-                    '_pgn': page,
-                    '_ipg': '50',
-                    'rt': 'nc'
-                }
-                
-                url = f"https://www.ebay.com/sch/i.html?{urlencode(params)}"
-                
-                response = self.session.get(url, timeout=15)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.content, 'html.parser')
-                items = soup.find_all('div', {'class': 's-item'})
-                
-                for item in items[:20]:  # More items per page for active
-                    listing = self.parse_active_listing(item)
-                    if listing:
-                        listings.append(listing)
-                
-                time.sleep(random.uniform(1.2, 2.5))
-                
-            except Exception as e:
-                logger.error(f"Error searching active listings for '{search_term}' page {page}: {e}")
-                continue
-        
-        logger.info(f"Found {len(listings)} active listings for '{search_term}'")
-        return listings
-    
-    def parse_sold_listing(self, item_soup) -> Optional[eBayListing]:
-        """Parse individual sold listing"""
+    def extract_listing_data(self, item_soup: BeautifulSoup, keyword: str) -> Optional[eBayListing]:
+        """Extract real listing data from eBay HTML"""
         try:
-            # Title
-            title_elem = item_soup.find('h3', class_='s-item__title')
-            if not title_elem:
-                return None
-            title = title_elem.get_text(strip=True).replace('New Listing', '').strip()
+            # Extract title
+            title_selectors = [
+                'h3.s-item__title span[role="heading"]',
+                'h3.s-item__title',
+                '.s-item__title span',
+                '.s-item__title'
+            ]
             
-            # Skip sponsored items
-            if 'SPONSORED' in title.upper():
-                return None
+            title = None
+            for selector in title_selectors:
+                title_elem = item_soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    break
             
-            # Price
-            price_elem = item_soup.find('span', class_='s-item__price')
-            if not price_elem:
-                return None
-            
-            price_text = price_elem.get_text(strip=True)
-            price = self.extract_price(price_text)
-            if price <= 0:
+            if not title or len(title) < 10:
                 return None
             
-            # Link and item ID
-            link_elem = item_soup.find('a', class_='s-item__link')
-            if not link_elem:
+            # Skip promotional content
+            skip_patterns = [
+                'shop on ebay', 'sponsored', 'advertisement', 'see more like this',
+                'you may also like', 'trending at', 'shop with confidence'
+            ]
+            
+            if any(pattern in title.lower() for pattern in skip_patterns):
                 return None
             
-            ebay_link = link_elem.get('href', '')
-            item_id = self.extract_item_id(ebay_link)
+            # Extract price
+            price = 0.0
+            price_selectors = [
+                '.s-item__price .notranslate',
+                '.s-item__price span.POSITIVE',
+                '.s-item__price'
+            ]
             
-            # Image
-            img_elem = item_soup.find('img', class_='s-item__image')
-            image_url = img_elem.get('src', '') if img_elem else ''
+            for selector in price_selectors:
+                price_elem = item_soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    
+                    # Handle price ranges
+                    if 'to' in price_text.lower() or ' - ' in price_text:
+                        prices = re.findall(r'\$?([\d,]+\.?\d*)', price_text)
+                        if prices:
+                            try:
+                                price = float(prices[0].replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
+                    else:
+                        price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text)
+                        if price_match:
+                            try:
+                                price = float(price_match.group(1).replace(',', ''))
+                                break
+                            except ValueError:
+                                continue
             
-            # Condition
-            condition_elem = item_soup.find('span', class_='SECONDARY_INFO')
-            condition = condition_elem.get_text(strip=True) if condition_elem else 'Used'
+            if price <= 0 or price > 50000:
+                return None
             
-            # Shipping (sold listings often don't show shipping separately)
+            # Extract shipping cost
             shipping_cost = 0.0
+            shipping_selectors = [
+                '.s-item__shipping .vi-price .notranslate',
+                '.s-item__shipping'
+            ]
+            
+            for selector in shipping_selectors:
+                shipping_elem = item_soup.select_one(selector)
+                if shipping_elem:
+                    shipping_text = shipping_elem.get_text(strip=True).lower()
+                    
+                    if 'free' in shipping_text:
+                        shipping_cost = 0.0
+                        break
+                    elif '$' in shipping_text:
+                        shipping_match = re.search(r'\$?([\d,]+\.?\d*)', shipping_text)
+                        if shipping_match:
+                            try:
+                                shipping_cost = float(shipping_match.group(1).replace(',', ''))
+                                shipping_cost = min(shipping_cost, price * 0.5)  # Cap shipping
+                                break
+                            except ValueError:
+                                continue
+            
+            total_cost = price + shipping_cost
+            
+            # Extract eBay link
+            ebay_link = ""
+            link_selectors = [
+                'a.s-item__link',
+                '.s-item__title a',
+                'h3.s-item__title a'
+            ]
+            
+            for selector in link_selectors:
+                link_elem = item_soup.select_one(selector)
+                if link_elem:
+                    href = link_elem.get('href', '')
+                    if href:
+                        if href.startswith('//'):
+                            ebay_link = 'https:' + href
+                        elif href.startswith('/'):
+                            ebay_link = 'https://www.ebay.com' + href
+                        elif href.startswith('http'):
+                            ebay_link = href
+                        
+                        # Clean URL
+                        if '?' in ebay_link:
+                            ebay_link = ebay_link.split('?')[0]
+                        
+                        if 'ebay.com' in ebay_link:
+                            break
+            
+            if not ebay_link:
+                return None
+            
+            # Extract item ID
+            item_id = None
+            item_id_patterns = [
+                r'/itm/([^/]+/)?(\d{12,})',
+                r'/(\d{12,})',
+                r'item/(\d{12,})'
+            ]
+            
+            for pattern in item_id_patterns:
+                match = re.search(pattern, ebay_link)
+                if match:
+                    groups = match.groups()
+                    item_id = groups[-1] if groups else None
+                    if item_id and item_id.isdigit() and len(item_id) >= 12:
+                        break
+            
+            if not item_id:
+                import hashlib
+                item_id = str(abs(hash(ebay_link + title)))[:12]
+            
+            # Check for duplicates
+            if item_id in self.seen_items:
+                return None
+            self.seen_items.add(item_id)
+            
+            # Extract condition
+            condition = "Unknown"
+            condition_selectors = [
+                '.SECONDARY_INFO',
+                '.s-item__subtitle',
+                '.s-item__condition'
+            ]
+            
+            for selector in condition_selectors:
+                condition_elem = item_soup.select_one(selector)
+                if condition_elem:
+                    condition_text = condition_elem.get_text(strip=True)
+                    
+                    condition_keywords = [
+                        'brand new', 'new', 'new with tags', 'sealed',
+                        'open box', 'like new', 'excellent', 'very good', 'good',
+                        'acceptable', 'used', 'pre-owned', 'refurbished'
+                    ]
+                    
+                    condition_lower = condition_text.lower()
+                    for keyword_cond in condition_keywords:
+                        if keyword_cond in condition_lower:
+                            condition = condition_text
+                            break
+                    
+                    if condition != "Unknown":
+                        break
+            
+            # Extract seller info
+            seller_username = "Unknown"
+            seller_rating = "Not available"
+            seller_feedback = "Not available"
+            
+            seller_selectors = [
+                '.s-item__seller-info-text',
+                '.s-item__seller-info'
+            ]
+            
+            for selector in seller_selectors:
+                seller_elem = item_soup.select_one(selector)
+                if seller_elem:
+                    seller_text = seller_elem.get_text(strip=True)
+                    
+                    # Extract rating
+                    rating_match = re.search(r'([\d.]+)%\s*positive', seller_text.lower())
+                    if rating_match:
+                        seller_rating = f"{rating_match.group(1)}%"
+                    
+                    # Extract feedback count
+                    feedback_patterns = [
+                        r'\((\d{1,3}(?:,\d{3})*)\)',
+                        r'(\d{1,3}(?:,\d{3})*)\s*feedback'
+                    ]
+                    
+                    for pattern in feedback_patterns:
+                        count_match = re.search(pattern, seller_text)
+                        if count_match:
+                            seller_feedback = count_match.group(1)
+                            break
+                    
+                    if seller_rating != "Not available":
+                        break
+            
+            # Extract image URL
+            image_url = ""
+            image_selectors = [
+                '.s-item__image img',
+                '.s-item__wrapper img'
+            ]
+            
+            for selector in image_selectors:
+                img_elem = item_soup.select_one(selector)
+                if img_elem:
+                    src = img_elem.get('src') or img_elem.get('data-src')
+                    if src:
+                        if 's-l' in src:
+                            src = re.sub(r's-l\d+', 's-l500', src)
+                        
+                        if src.startswith('//'):
+                            image_url = 'https:' + src
+                        elif src.startswith('/'):
+                            image_url = 'https://www.ebay.com' + src
+                        else:
+                            image_url = src
+                        break
+            
+            # Extract location
+            location = "Unknown"
+            location_selectors = [
+                '.s-item__location',
+                '.s-item__itemLocation'
+            ]
+            
+            for selector in location_selectors:
+                location_elem = item_soup.select_one(selector)
+                if location_elem:
+                    location_text = location_elem.get_text(strip=True)
+                    if location_text:
+                        location = location_text.replace('From', '').replace('from', '').strip()
+                    break
+            
+            # Additional info
+            is_auction = bool(item_soup.select_one('.s-item__time-left, .timeMs'))
+            watchers = "Not available"
+            bids = "0" if not is_auction else "Unknown"
+            time_left = "Buy It Now" if not is_auction else "Unknown"
             
             return eBayListing(
                 item_id=item_id,
                 title=title,
                 price=price,
                 shipping_cost=shipping_cost,
-                total_cost=price + shipping_cost,
+                total_cost=total_cost,
                 condition=condition,
-                seller_username='',
-                seller_rating='',
-                seller_feedback='',
+                seller_username=seller_username,
+                seller_rating=seller_rating,
+                seller_feedback=seller_feedback,
                 image_url=image_url,
                 ebay_link=ebay_link,
-                location='',
-                listing_date='',
-                watchers='',
-                bids='',
-                time_left='',
-                is_auction=False,
-                buy_it_now_available=True
+                location=location,
+                listing_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                watchers=watchers,
+                bids=bids,
+                time_left=time_left,
+                is_auction=is_auction,
+                buy_it_now_available=not is_auction
             )
             
         except Exception as e:
-            logger.error(f"Error parsing sold listing: {e}")
+            logger.error(f"Error extracting listing data: {e}")
             return None
     
-    def parse_active_listing(self, item_soup) -> Optional[eBayListing]:
-        """Parse individual active listing"""
-        try:
-            # Title
-            title_elem = item_soup.find('h3', class_='s-item__title')
-            if not title_elem:
-                return None
-            title = title_elem.get_text(strip=True).replace('New Listing', '').strip()
-            
-            # Skip sponsored
-            if 'SPONSORED' in title.upper():
-                return None
-            
-            # Price
-            price_elem = item_soup.find('span', class_='s-item__price')
-            if not price_elem:
-                return None
-            
-            price_text = price_elem.get_text(strip=True)
-            price = self.extract_price(price_text)
-            if price <= 0:
-                return None
-            
-            # Shipping
-            shipping_elem = item_soup.find('span', class_='s-item__shipping')
-            shipping_cost = 0.0
-            if shipping_elem:
-                shipping_text = shipping_elem.get_text(strip=True)
-                if 'free' not in shipping_text.lower():
-                    shipping_cost = self.extract_price(shipping_text)
-            
-            # Link and item ID
-            link_elem = item_soup.find('a', class_='s-item__link')
-            if not link_elem:
-                return None
-            
-            ebay_link = link_elem.get('href', '')
-            item_id = self.extract_item_id(ebay_link)
-            
-            # Other details
-            img_elem = item_soup.find('img', class_='s-item__image')
-            image_url = img_elem.get('src', '') if img_elem else ''
-            
-            condition_elem = item_soup.find('span', class_='SECONDARY_INFO')
-            condition = condition_elem.get_text(strip=True) if condition_elem else 'Used'
-            
-            return eBayListing(
-                item_id=item_id,
-                title=title,
-                price=price,
-                shipping_cost=shipping_cost,
-                total_cost=price + shipping_cost,
-                condition=condition,
-                seller_username='',
-                seller_rating='',
-                seller_feedback='',
-                image_url=image_url,
-                ebay_link=ebay_link,
-                location='',
-                listing_date='',
-                watchers='',
-                bids='',
-                time_left='',
-                is_auction=False,
-                buy_it_now_available=True
-            )
-            
-        except Exception as e:
-            logger.error(f"Error parsing active listing: {e}")
-            return None
-    
-    def extract_price(self, price_text: str) -> float:
-        """Extract numerical price from text"""
-        try:
-            # Remove currency symbols and extra text
-            price_text = re.sub(r'[^\d.,]', '', price_text)
-            price_text = price_text.replace(',', '')
-            
-            if not price_text:
-                return 0.0
-            
-            return float(price_text)
-        except:
-            return 0.0
-    
-    def extract_item_id(self, url: str) -> str:
-        """Extract eBay item ID from URL"""
-        try:
-            match = re.search(r'/itm/(\d+)', url)
-            return match.group(1) if match else f"unknown_{random.randint(100000, 999999)}"
-        except:
-            return f"unknown_{random.randint(100000, 999999)}"
-    
-    def scan_category_for_arbitrage(self, category: str, min_profit: float = 15.0) -> List[Dict]:
-        """Enhanced category scanning with better coverage"""
-        
-        logger.info(f"🎯 Enhanced scanning category: {category}")
-        
-        search_terms = self.get_enhanced_search_terms(category)
-        if not search_terms:
-            logger.warning(f"No search terms defined for category: {category}")
-            return []
+    def search_ebay(self, keyword: str, limit: int = 50, sort_order: str = "price", 
+                   max_pages: int = 3) -> List[eBayListing]:
+        """Search eBay for real listings"""
+        logger.info(f"🔍 Searching eBay for: '{keyword}' (limit: {limit})")
         
         all_listings = []
         
-        # Sample multiple search terms for better coverage
-        selected_terms = random.sample(search_terms, min(6, len(search_terms)))
-        
-        for search_term in selected_terms:
-            logger.info(f"🔍 Searching: {search_term}")
-            
+        for page in range(1, max_pages + 1):
             try:
-                # Get both active and sold listings
-                active_listings = self.search_ebay_active_listings(search_term, max_pages=3)
-                sold_listings = self.search_ebay_sold_listings(search_term, max_pages=2)
+                url = self.build_search_url(keyword, page, sort_order)
+                soup = self.get_page(url)
                 
-                # Combine and add variety
-                combined = active_listings + sold_listings
-                all_listings.extend(combined)
+                if not soup:
+                    logger.warning(f"Failed to get page {page} for '{keyword}'")
+                    break
                 
-                # Add delay between searches
+                # Find item containers
+                items = soup.select('.s-item__wrapper, .s-item')
+                
+                if not items:
+                    logger.warning(f"No items found on page {page}")
+                    break
+                
+                logger.info(f"Found {len(items)} items on page {page}")
+                
+                page_listings = []
+                for item in items:
+                    listing = self.extract_listing_data(item, keyword)
+                    if listing:
+                        page_listings.append(listing)
+                
+                all_listings.extend(page_listings)
+                logger.info(f"Extracted {len(page_listings)} valid listings from page {page}")
+                
+                # Stop if we have enough listings
+                if len(all_listings) >= limit:
+                    break
+                
+                # Rate limiting between pages
                 time.sleep(random.uniform(2.0, 4.0))
                 
             except Exception as e:
-                logger.error(f"Error searching '{search_term}': {e}")
+                logger.error(f"Error searching page {page}: {e}")
                 continue
         
-        if not all_listings:
-            logger.warning(f"No listings found for category: {category}")
-            return []
+        # Sort by price if requested
+        if sort_order == "price":
+            all_listings.sort(key=lambda x: x.total_cost)
         
-        # Remove duplicates by item_id
-        unique_listings = {}
-        for listing in all_listings:
-            if listing.item_id not in unique_listings:
-                unique_listings[listing.item_id] = listing
+        logger.info(f"✅ Search completed: {len(all_listings)} real listings found")
+        return all_listings[:limit]
+    
+    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
+        """Find arbitrage opportunities by comparing similar listings"""
+        logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
         
-        final_listings = list(unique_listings.values())
-        logger.info(f"📊 Processing {len(final_listings)} unique listings for {category}")
+        opportunities = []
+        
+        # Group similar products
+        from difflib import SequenceMatcher
+        
+        for i, buy_listing in enumerate(listings[:-1]):
+            for sell_listing in listings[i+1:]:
+                
+                # Calculate title similarity
+                similarity = SequenceMatcher(None, 
+                                           buy_listing.title.lower(), 
+                                           sell_listing.title.lower()).ratio()
+                
+                # Must be similar enough (same product)
+                if similarity < 0.6:
+                    continue
+                
+                # Must have meaningful price difference
+                price_diff = sell_listing.total_cost - buy_listing.total_cost
+                if price_diff < min_profit:
+                    continue
+                
+                # Calculate fees and net profit
+                gross_profit = sell_listing.price - buy_listing.total_cost
+                ebay_fees = sell_listing.price * 0.129  # ~12.9% eBay final value fee
+                paypal_fees = sell_listing.price * 0.0349 + 0.49  # PayPal fees
+                shipping_cost = 8.0 if sell_listing.shipping_cost == 0 else 0
+                
+                total_fees = ebay_fees + paypal_fees + shipping_cost
+                net_profit = gross_profit - total_fees
+                
+                if net_profit >= min_profit:
+                    roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
+                    
+                    # Calculate confidence
+                    confidence = 40
+                    if similarity > 0.8:
+                        confidence += 30
+                    elif similarity > 0.7:
+                        confidence += 20
+                    elif similarity > 0.6:
+                        confidence += 10
+                    
+                    if net_profit >= 30:
+                        confidence += 20
+                    elif net_profit >= 20:
+                        confidence += 15
+                    elif net_profit >= 15:
+                        confidence += 10
+                    
+                    if 'new' in buy_listing.condition.lower():
+                        confidence += 10
+                    
+                    opportunity = {
+                        'opportunity_id': f"REAL_{int(time.time())}_{random.randint(1000, 9999)}",
+                        'buy_listing': asdict(buy_listing),
+                        'sell_reference': asdict(sell_listing),
+                        'similarity_score': round(similarity, 3),
+                        'confidence_score': min(95, confidence),
+                        'risk_level': 'LOW' if roi < 50 else 'MEDIUM' if roi < 100 else 'HIGH',
+                        'gross_profit': round(gross_profit, 2),
+                        'net_profit_after_fees': round(net_profit, 2),
+                        'roi_percentage': round(roi, 1),
+                        'estimated_fees': round(total_fees, 2),
+                        'profit_analysis': {
+                            'gross_profit': gross_profit,
+                            'net_profit_after_fees': net_profit,
+                            'roi_percentage': roi,
+                            'estimated_fees': total_fees,
+                            'fee_breakdown': {
+                                'ebay_fee': ebay_fees,
+                                'payment_fee': paypal_fees,
+                                'shipping_cost': shipping_cost
+                            }
+                        },
+                        'created_at': datetime.now().isoformat()
+                    }
+                    
+                    opportunities.append(opportunity)
+        
+        # Sort by profitability
+        opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
+        
+        logger.info(f"✅ Found {len(opportunities)} real arbitrage opportunities")
+        return opportunities[:20]  # Return top 20
+
+# Global scraper instance
+scraper = RealTimeeBayScraper()
+
+def search_ebay_real(keyword: str, limit: int = 50, sort: str = "price") -> List[Dict]:
+    """Main function to search eBay for real listings"""
+    try:
+        listings = scraper.search_ebay(keyword, limit, sort)
+        return [asdict(listing) for listing in listings]
+    except Exception as e:
+        logger.error(f"Real eBay search failed: {e}")
+        return []
+
+def find_arbitrage_real(keyword: str, min_profit: float = 15.0, limit: int = 50) -> Dict:
+    """Find real arbitrage opportunities"""
+    try:
+        start_time = datetime.now()
+        
+        # Get real listings
+        listings = scraper.search_ebay(keyword, limit, "price")
         
         # Find arbitrage opportunities
-        opportunities = self.arbitrage_detector.find_arbitrage_opportunities(
-            final_listings, min_profit
-        )
+        opportunities = scraper.find_arbitrage_opportunities(listings, min_profit)
         
-        logger.info(f"✅ Found {len(opportunities)} opportunities in {category}")
-        return opportunities
-
-
-def main():
-    """Enhanced main function for testing"""
-    
-    scraper = EnhancedeBayScraper()
-    
-    # Test all categories
-    categories = ['tech', 'gaming', 'collectibles', 'fashion']
-    
-    for category in categories:
-        print(f"\n{'='*50}")
-        print(f"🎯 SCANNING CATEGORY: {category.upper()}")
-        print(f"{'='*50}")
+        # Calculate summary
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
         
-        try:
-            opportunities = scraper.scan_category_for_arbitrage(category, min_profit=12.0)
+        total_opportunities = len(opportunities)
+        avg_profit = sum(opp['net_profit_after_fees'] for opp in opportunities) / max(total_opportunities, 1)
+        highest_profit = max([opp['net_profit_after_fees'] for opp in opportunities], default=0)
+        avg_roi = sum(opp['roi_percentage'] for opp in opportunities) / max(total_opportunities, 1)
+        
+        return {
+            'scan_metadata': {
+                'scan_id': f"REAL_{int(time.time())}",
+                'timestamp': end_time.isoformat(),
+                'duration_seconds': round(duration, 2),
+                'total_searches_performed': 1,
+                'total_listings_analyzed': len(listings),
+                'arbitrage_opportunities_found': total_opportunities,
+                'scan_efficiency': round((total_opportunities / max(len(listings), 1)) * 100, 2),
+                'keywords_used': [keyword],
+                'unique_products_found': len(listings)
+            },
+            'opportunities_summary': {
+                'total_opportunities': total_opportunities,
+                'average_profit_after_fees': round(avg_profit, 2),
+                'average_roi': round(avg_roi, 1),
+                'highest_profit': round(highest_profit, 2),
+                'risk_distribution': {
+                    'low': len([opp for opp in opportunities if opp['risk_level'] == 'LOW']),
+                    'medium': len([opp for opp in opportunities if opp['risk_level'] == 'MEDIUM']),
+                    'high': len([opp for opp in opportunities if opp['risk_level'] == 'HIGH'])
+                }
+            },
+            'top_opportunities': opportunities
+        }
+        
+    except Exception as e:
+        logger.error(f"Arbitrage analysis failed: {e}")
+        return {
+            'scan_metadata': {'error': str(e)},
+            'opportunities_summary': {'total_opportunities': 0},
+            'top_opportunities': []
+        }
+
+# Demo function
+def demo_real_scraper():
+    """Demo the real scraper"""
+    print("🚀 FlipHawk Real-Time eBay Scraper Demo")
+    print("=" * 50)
+    print("⚠️  This scrapes REAL eBay data - NO DUMMY DATA")
+    print()
+    
+    test_keyword = "airpods pro"
+    
+    print(f"🔍 Searching for: '{test_keyword}'")
+    results = find_arbitrage_real(test_keyword, min_profit=10.0, limit=20)
+    
+    print(f"\n📊 REAL RESULTS:")
+    print(f"⏱️  Duration: {results['scan_metadata']['duration_seconds']} seconds")
+    print(f"🔍 Listings analyzed: {results['scan_metadata']['total_listings_analyzed']}")
+    print(f"💎 Arbitrage opportunities: {results['opportunities_summary']['total_opportunities']}")
+    
+    if results['top_opportunities']:
+        print(f"\n🏆 TOP ARBITRAGE OPPORTUNITIES:")
+        for i, opp in enumerate(results['top_opportunities'][:3], 1):
+            buy = opp['buy_listing']
+            sell = opp['sell_reference']
             
-            if opportunities:
-                print(f"✅ Found {len(opportunities)} opportunities in {category}:")
-                
-                for i, opp in enumerate(opportunities[:5], 1):
-                    print(f"\n{i}. OPPORTUNITY #{opp['opportunity_id']}")
-                    print(f"   📦 BUY: {opp['buy_listing']['title'][:60]}...")
-                    print(f"   💰 Buy Price: ${opp['buy_listing']['total_cost']:.2f}")
-                    print(f"   🎯 Sell Reference: ${opp['sell_reference']['price']:.2f}")
-                    print(f"   💵 Net Profit: ${opp['net_profit_after_fees']:.2f}")
-                    print(f"   📈 ROI: {opp['roi_percentage']:.1f}%")
-                    print(f"   🔄 Similarity: {opp['similarity_score']:.3f}")
-                    print(f"   ⭐ Confidence: {opp['confidence_score']}%")
-                    print(f"   ⚠️  Risk: {opp['risk_level']}")
-            else:
-                print(f"❌ No opportunities found in {category}")
-                
-        except Exception as e:
-            print(f"❌ Error scanning {category}: {e}")
-            logger.error(f"Category scan error for {category}: {e}")
-        
-        # Delay between categories
-        time.sleep(5)
+            print(f"\n{i}. OPPORTUNITY #{opp['opportunity_id']}")
+            print(f"   🛒 Buy: {buy['title'][:60]}...")
+            print(f"   💰 Buy Price: ${buy['total_cost']:.2f}")
+            print(f"   💸 Sell Reference: ${sell['price']:.2f}")
+            print(f"   💵 Net Profit: ${opp['net_profit_after_fees']:.2f}")
+            print(f"   📈 ROI: {opp['roi_percentage']:.1f}%")
+            print(f"   🎯 Confidence: {opp['confidence_score']}%")
+            print(f"   🔗 Buy Link: {buy['ebay_link']}")
+    else:
+        print("\n❌ No arbitrage opportunities found")
+        print("💡 Try different keywords or lower the minimum profit")
+    
+    print("\n" + "=" * 50)
+    print("✅ Real demo completed!")
 
 if __name__ == "__main__":
-    main()
+    demo_real_scraper()
