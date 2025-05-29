@@ -670,134 +670,222 @@ class RealTimeeBayScraper:
         
         return unique_listings
     
-    def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
-        """Find arbitrage opportunities with improved matching"""
-        logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
-        
-        opportunities = []
-        processed_pairs = set()  # Track processed pairs to avoid duplicates
-        
-        # Sort listings by price for better comparison
-        sorted_listings = sorted(listings, key=lambda x: x.total_cost)
-        
-        for i, buy_listing in enumerate(sorted_listings):
-            for j, sell_listing in enumerate(sorted_listings[i+1:], i+1):
-                # Create unique pair identifier
-                pair_id = tuple(sorted([buy_listing.item_id, sell_listing.item_id]))
-                if pair_id in processed_pairs:
-                    continue
-                processed_pairs.add(pair_id)
-                
-                # Skip if price difference is too small
-                price_diff = sell_listing.total_cost - buy_listing.total_cost
-                if price_diff < min_profit * 0.5:  # At least half of min profit before fees
-                    continue
-                
-                # Calculate similarity with improved matching
-                similarity = self.calculate_similarity(buy_listing.title, sell_listing.title)
-                
-                # Lower threshold for different categories
-                min_similarity = 0.25  # Much lower threshold
-                
-                # Category-specific adjustments
-                if any(cat in buy_listing.title.lower() for cat in ['pokemon', 'cards', 'tcg']):
-                    min_similarity = 0.2  # Even lower for trading cards
-                elif any(cat in buy_listing.title.lower() for cat in ['ps5', 'xbox', 'nintendo']):
-                    min_similarity = 0.3  # Gaming consoles
-                elif any(cat in buy_listing.title.lower() for cat in ['jordan', 'nike', 'yeezy']):
-                    min_similarity = 0.25  # Sneakers
-                
-                if similarity < min_similarity:
-                    continue
-                
-                # Check if items are likely the same product
-                if not self.are_same_product(buy_listing, sell_listing):
-                    continue
-                
-                # Calculate realistic fees and profit
-                gross_profit = sell_listing.price - buy_listing.total_cost
-                
-                # More realistic fee structure
-                ebay_fees = sell_listing.price * 0.087  # 8.7% average eBay fees
-                payment_fees = sell_listing.price * 0.029 + 0.30  # 2.9% + $0.30
-                
-                # Shipping cost if we need to ship
-                estimated_shipping = 5.0 if sell_listing.shipping_cost == 0 else 0
-                
-                total_fees = ebay_fees + payment_fees + estimated_shipping
-                net_profit = gross_profit - total_fees
-                
-                # Check if still profitable
-                if net_profit < min_profit:
-                    continue
-                
-                roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
-                
-                # Calculate confidence score
-                confidence = self.calculate_confidence(buy_listing, sell_listing, similarity, net_profit, roi)
-                
-                # Determine risk level
-                if roi < 20:
-                    risk_level = 'LOW'
-                elif roi < 50:
-                    risk_level = 'MEDIUM'
-                else:
-                    risk_level = 'HIGH'
-                
-                opportunity = {
-                    'opportunity_id': f"ARB_{int(time.time())}_{random.randint(1000, 9999)}",
-                    'buy_listing': asdict(buy_listing),
-                    'sell_reference': asdict(sell_listing),
-                    'similarity_score': round(similarity, 3),
-                    'confidence_score': confidence,
-                    'risk_level': risk_level,
-                    'gross_profit': round(gross_profit, 2),
-                    'net_profit_after_fees': round(net_profit, 2),
-                    'roi_percentage': round(roi, 1),
-                    'estimated_fees': round(total_fees, 2),
-                    'profit_analysis': {
-                        'gross_profit': gross_profit,
-                        'net_profit_after_fees': net_profit,
-                        'roi_percentage': roi,
-                        'estimated_fees': total_fees,
-                        'fee_breakdown': {
-                            'ebay_fee': round(ebay_fees, 2),
-                            'payment_fee': round(payment_fees, 2),
-                            'shipping_cost': estimated_shipping
-                        }
-                    },
-                    'created_at': datetime.now().isoformat()
-                }
-                
-                opportunities.append(opportunity)
-        
-        # Sort by net profit
-        opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
-        
-        # Remove similar opportunities
-        unique_opportunities = self.remove_duplicate_opportunities(opportunities)
-        
-        logger.info(f"✅ Found {len(unique_opportunities)} unique arbitrage opportunities")
-        return unique_opportunities
+def find_arbitrage_opportunities(self, listings: List[eBayListing], min_profit: float = 15.0) -> List[Dict]:
+    """Find arbitrage opportunities with strict product matching"""
+    logger.info(f"🎯 Analyzing {len(listings)} listings for arbitrage opportunities...")
     
-    def are_same_product(self, listing1: eBayListing, listing2: eBayListing) -> bool:
-        """Check if two listings are likely the same product"""
-        title1_lower = listing1.title.lower()
-        title2_lower = listing2.title.lower()
+    opportunities = []
+    processed_pairs = set()
+    
+    # Sort listings by price
+    sorted_listings = sorted(listings, key=lambda x: x.total_cost)
+    
+    for i, buy_listing in enumerate(sorted_listings):
+        for j, sell_listing in enumerate(sorted_listings[i+1:], i+1):
+            # Skip if already processed
+            pair_id = tuple(sorted([buy_listing.item_id, sell_listing.item_id]))
+            if pair_id in processed_pairs:
+                continue
+            processed_pairs.add(pair_id)
+            
+            # CRITICAL: Skip obvious mismatches
+            buy_title_lower = buy_listing.title.lower()
+            sell_title_lower = sell_listing.title.lower()
+            
+            # Skip if one is "console not included" and other isn't
+            if ('not included' in buy_title_lower) != ('not included' in sell_title_lower):
+                continue
+            
+            # Skip if one is dock/accessory and other is console
+            buy_is_accessory = any(acc in buy_title_lower for acc in ['dock', 'cable', 'adapter', 'case', 'grip'])
+            sell_is_accessory = any(acc in sell_title_lower for acc in ['dock', 'cable', 'adapter', 'case', 'grip'])
+            if buy_is_accessory != sell_is_accessory:
+                continue
+            
+            # Skip if different product types
+            buy_is_console = any(term in buy_title_lower for term in ['console', 'system', 'handheld'])
+            sell_is_console = any(term in sell_title_lower for term in ['console', 'system', 'handheld'])
+            if buy_is_console != sell_is_console:
+                continue
+            
+            # Price difference check
+            price_diff = sell_listing.total_cost - buy_listing.total_cost
+            if price_diff < min_profit:
+                continue
+            
+            # Similarity check with stricter threshold
+            similarity = self.calculate_similarity(buy_listing.title, sell_listing.title)
+            
+            # Category-specific minimum similarity
+            min_similarity = 0.4  # Base threshold
+            
+            # Gaming consoles need higher similarity
+            if any(console in buy_title_lower for console in ['switch', 'ps5', 'xbox']):
+                min_similarity = 0.5
+                
+                # Check for same model
+                if 'oled' in buy_title_lower and 'oled' not in sell_title_lower:
+                    continue
+                if 'oled' not in buy_title_lower and 'oled' in sell_title_lower:
+                    continue
+            
+            # Pokemon cards need specific matching
+            elif 'pokemon' in buy_title_lower:
+                min_similarity = 0.35
+                # Must have same pokemon if specified
+                pokemon_names = ['charizard', 'pikachu', 'blastoise', 'venusaur', 'mewtwo']
+                buy_pokemon = [p for p in pokemon_names if p in buy_title_lower]
+                sell_pokemon = [p for p in pokemon_names if p in sell_title_lower]
+                if buy_pokemon and sell_pokemon and buy_pokemon != sell_pokemon:
+                    continue
+            
+            # Sneakers need color/size matching
+            elif any(shoe in buy_title_lower for shoe in ['jordan', 'nike', 'yeezy']):
+                min_similarity = 0.4
+                # Check size if specified
+                size_pattern = r'\b(?:size|sz)\s*(\d+(?:\.\d+)?)\b'
+                buy_size = re.search(size_pattern, buy_title_lower)
+                sell_size = re.search(size_pattern, sell_title_lower)
+                if buy_size and sell_size and buy_size.group(1) != sell_size.group(1):
+                    continue
+            
+            if similarity < min_similarity:
+                continue
+            
+            # Additional validation
+            if not self.validate_arbitrage_opportunity(buy_listing, sell_listing):
+                continue
+            
+            # Calculate fees and profit
+            gross_profit = sell_listing.price - buy_listing.total_cost
+            
+            # Realistic fee structure
+            ebay_fees = sell_listing.price * 0.1  # 10% average
+            payment_fees = sell_listing.price * 0.029 + 0.30
+            shipping_cost = 7.0 if sell_listing.shipping_cost == 0 else 0
+            
+            total_fees = ebay_fees + payment_fees + shipping_cost
+            net_profit = gross_profit - total_fees
+            
+            if net_profit < min_profit:
+                continue
+            
+            roi = (net_profit / buy_listing.total_cost) * 100 if buy_listing.total_cost > 0 else 0
+            
+            # Skip unrealistic ROI
+            if roi > 100:  # Skip if ROI is over 100%
+                continue
+            
+            # Calculate confidence
+            confidence = self.calculate_confidence(buy_listing, sell_listing, similarity, net_profit, roi)
+            
+            # Risk level
+            if roi < 25:
+                risk_level = 'LOW'
+            elif roi < 50:
+                risk_level = 'MEDIUM'
+            else:
+                risk_level = 'HIGH'
+            
+            opportunity = {
+                'opportunity_id': f"ARB_{int(time.time())}_{random.randint(1000, 9999)}",
+                'buy_listing': asdict(buy_listing),
+                'sell_reference': asdict(sell_listing),
+                'similarity_score': round(similarity, 3),
+                'confidence_score': confidence,
+                'risk_level': risk_level,
+                'gross_profit': round(gross_profit, 2),
+                'net_profit_after_fees': round(net_profit, 2),
+                'roi_percentage': round(roi, 1),
+                'estimated_fees': round(total_fees, 2),
+                'profit_analysis': {
+                    'gross_profit': gross_profit,
+                    'net_profit_after_fees': net_profit,
+                    'roi_percentage': roi,
+                    'estimated_fees': total_fees,
+                    'fee_breakdown': {
+                        'ebay_fee': round(ebay_fees, 2),
+                        'payment_fee': round(payment_fees, 2),
+                        'shipping_cost': shipping_cost
+                    }
+                },
+                'created_at': datetime.now().isoformat()
+            }
+            
+            opportunities.append(opportunity)
+    
+    # Sort by net profit
+    opportunities.sort(key=lambda x: x['net_profit_after_fees'], reverse=True)
+    
+    # Remove duplicates and limit results
+    unique_opportunities = self.remove_duplicate_opportunities(opportunities)
+    
+    # Cap at reasonable number
+    max_opportunities = 25
+    unique_opportunities = unique_opportunities[:max_opportunities]
+    
+    logger.info(f"✅ Found {len(unique_opportunities)} valid arbitrage opportunities")
+    return unique_opportunities
+
+def validate_arbitrage_opportunity(self, buy_listing: eBayListing, sell_listing: eBayListing) -> bool:
+    """Validate that an arbitrage opportunity makes sense"""
+    buy_title_lower = buy_listing.title.lower()
+    sell_title_lower = sell_listing.title.lower()
+    
+    # Exclude obvious bad matches
+    exclusion_patterns = [
+        # Parts vs complete items
+        ('parts', 'working'),
+        ('broken', 'working'),
+        ('for parts', 'tested'),
+        ('as-is', 'guaranteed'),
+        ('untested', 'tested'),
         
-        # Extract key identifiers
-        identifiers1 = set()
-        identifiers2 = set()
+        # Accessories vs main items
+        ('case only', 'console'),
+        ('box only', 'complete'),
+        ('manual only', 'game'),
         
-        # Model numbers
-        model_pattern = r'\b[A-Z0-9]{3,}(?:-[A-Z0-9]+)*\b'
-        models1 = re.findall(model_pattern, listing1.title)
-        models2 = re.findall(model_pattern, listing2.title)
+        # Different regions
+        ('japan', 'usa'),
+        ('pal', 'ntsc'),
+        ('uk version', 'us version'),
+    ]
+    
+    for pattern1, pattern2 in exclusion_patterns:
+        if (pattern1 in buy_title_lower and pattern2 in sell_title_lower) or \
+           (pattern2 in buy_title_lower and pattern1 in sell_title_lower):
+            return False
+    
+    # Validate condition makes sense
+    buy_condition_lower = buy_listing.condition.lower()
+    sell_condition_lower = sell_listing.condition.lower()
+    
+    # Can't sell "new" if buying "used"
+    if ('used' in buy_condition_lower or 'pre-owned' in buy_condition_lower) and \
+       ('new' in sell_condition_lower or 'sealed' in sell_condition_lower):
+        return False
+    
+    # Size/capacity must match
+    size_pattern = r'\b(\d+)(?:gb|tb|mm|ml|oz)\b'
+    buy_sizes = re.findall(size_pattern, buy_title_lower)
+    sell_sizes = re.findall(size_pattern, sell_title_lower)
+    
+    if buy_sizes and sell_sizes:
+        # All sizes must match
+        if set(buy_sizes) != set(sell_sizes):
+            return False
+    
+    # Color validation for fashion
+    if any(fashion in buy_title_lower for fashion in ['shoe', 'sneaker', 'jordan']):
+        colors = ['black', 'white', 'red', 'blue', 'green', 'pink', 'yellow', 'grey', 'gray']
+        buy_colors = [c for c in colors if c in buy_title_lower]
+        sell_colors = [c for c in colors if c in sell_title_lower]
         
-        if models1 and models2:
-            common_models = set(models1) & set(models2)
-            if common_models:
-                return True
+        if buy_colors and sell_colors and set(buy_colors) != set(sell_colors):
+            return False
+    
+    return True
         
         # Size/capacity matching
         size_pattern = r'\b\d+(?:gb|tb|mm|ml|oz|inch|")\b'
